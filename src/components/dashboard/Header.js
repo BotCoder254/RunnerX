@@ -1,32 +1,42 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Activity, 
-  Plus, 
-  Settings, 
-  Moon, 
-  Sun, 
+import React from "react";
+import { motion } from "framer-motion";
+import {
+  Plus,
+  Settings,
+  Moon,
+  Sun,
   Menu,
   LogOut,
   Lock,
-  Bell
-} from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../hooks/useNotifications';
-import { useUserPreferences, useUpdateUserPreferences } from '../../hooks/useUserPreferences';
-import DisplayModeToggle from './DisplayModeToggle';
+  Bell,
+} from "lucide-react";
+import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { useNotifications } from "../../hooks/useNotifications";
+import {
+  useUserPreferences,
+  useUpdateUserPreferences,
+} from "../../hooks/useUserPreferences";
+import DisplayModeToggle from "./DisplayModeToggle";
 
-const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayMode, onDisplayModeChange }) => {
+const Header = ({
+  onAddMonitor,
+  onToggleSidebar,
+  onToggleNotifications,
+  displayMode,
+  onDisplayModeChange,
+}) => {
   const { isDark, toggleTheme } = useTheme();
   const { user, logout, lock } = useAuth();
   const { data: notifications } = useNotifications();
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const { data: preferences } = useUserPreferences();
   const updatePreferences = useUpdateUserPreferences();
-  const showForecast = preferences?.show_forecast ?? (localStorage.getItem('show_forecast') !== 'false');
+  const showForecast =
+    preferences?.show_forecast ??
+    localStorage.getItem("show_forecast") !== "false";
 
-  const unreadCount = notifications?.filter(n => !n.seen_at).length || 0;
+  const unreadCount = notifications?.filter((n) => !n.seen_at).length || 0;
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-lg border-b border-neutral-200 dark:border-neutral-800">
@@ -39,14 +49,18 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
           >
             <Menu className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
           </button>
-          
+
           <div className="flex items-center gap-3">
             <motion.div
-              whileHover={{ rotate: 180 }}
+              whileHover={{ scale: 1.05 }}
               transition={{ duration: 0.3 }}
-              className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30"
+              className="flex items-center justify-center"
             >
-              <Activity className="w-6 h-6 text-white" strokeWidth={2.5} />
+              <img
+                src="/runnerx.png"
+                alt="RunnerX Logo"
+                className="w-10 h-10 object-contain"
+              />
             </motion.div>
             <div>
               <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
@@ -73,7 +87,10 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
 
           {/* Display Mode Toggle */}
           <div className="hidden lg:block">
-            <DisplayModeToggle currentMode={displayMode} onChange={onDisplayModeChange} />
+            <DisplayModeToggle
+              currentMode={displayMode}
+              onChange={onDisplayModeChange}
+            />
           </div>
 
           {/* Notifications */}
@@ -85,7 +102,7 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
             <Bell className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
             {unreadCount > 0 && (
               <span className="absolute top-0 right-0 w-4 h-4 bg-danger-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
+                {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
           </button>
@@ -93,7 +110,7 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
           <button
             onClick={toggleTheme}
             className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition"
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
           >
             {isDark ? (
               <Sun className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
@@ -102,7 +119,11 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
             )}
           </button>
 
-          <a href="/dashboard?section=automation" className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition hidden md:block" title="Automation">
+          <a
+            href="/dashboard?section=automation"
+            className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition hidden md:block"
+            title="Automation"
+          >
             <Settings className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
           </a>
           {/* Quick Settings Dropdown */}
@@ -117,7 +138,7 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
               className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center hover:ring-2 hover:ring-primary-500 transition"
             >
               <span className="text-sm font-semibold text-primary-700 dark:text-primary-400">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
+                {user?.name?.charAt(0).toUpperCase() || "U"}
               </span>
             </button>
 
@@ -141,19 +162,21 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
                     </p>
                   </div>
                   <div className="p-2">
-                  <div className="px-3 py-2 text-xs uppercase text-neutral-500 dark:text-neutral-400">Preferences</div>
-                  <label className="w-full flex items-center justify-between px-3 py-2 text-neutral-700 dark:text-neutral-300">
-                    <span className="text-sm">Show forecast</span>
-                    <input
-                      type="checkbox"
-                      checked={!!showForecast}
-                      onChange={(e) => {
-                        const val = e.target.checked;
-                        localStorage.setItem('show_forecast', String(val));
-                        updatePreferences.mutate({ show_forecast: val });
-                      }}
-                    />
-                  </label>
+                    <div className="px-3 py-2 text-xs uppercase text-neutral-500 dark:text-neutral-400">
+                      Preferences
+                    </div>
+                    <label className="w-full flex items-center justify-between px-3 py-2 text-neutral-700 dark:text-neutral-300">
+                      <span className="text-sm">Show forecast</span>
+                      <input
+                        type="checkbox"
+                        checked={!!showForecast}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          localStorage.setItem("show_forecast", String(val));
+                          updatePreferences.mutate({ show_forecast: val });
+                        }}
+                      />
+                    </label>
                     <button
                       onClick={() => {
                         lock();
@@ -186,4 +209,3 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
 };
 
 export default Header;
-

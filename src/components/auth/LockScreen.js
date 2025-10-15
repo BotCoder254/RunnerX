@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Lock, Activity } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Lock } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { toast } from "react-toastify";
 
 const LockScreen = () => {
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { unlock, user, logout } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
-      toast.error('Please enter your password');
+      toast.error("Please enter your password");
       return;
     }
 
@@ -20,15 +20,15 @@ const LockScreen = () => {
     try {
       const success = await unlock(password);
       if (success) {
-        toast.success('Unlocked successfully!');
+        toast.success("Unlocked successfully!");
       } else {
-        toast.error('Invalid password');
+        toast.error("Invalid password");
       }
     } catch (error) {
-      toast.error('Failed to unlock');
+      toast.error("Failed to unlock");
     } finally {
       setLoading(false);
-      setPassword('');
+      setPassword("");
     }
   };
 
@@ -48,8 +48,12 @@ const LockScreen = () => {
           >
             <Lock className="w-10 h-10 text-neutral-400" strokeWidth={2} />
           </motion.div>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Activity className="w-6 h-6 text-primary-500" />
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <img
+              src="/runnerx.png"
+              alt="RunnerX Logo"
+              className="w-8 h-8 object-contain"
+            />
             <h1 className="text-3xl font-bold text-white">RunnerX</h1>
           </div>
           <p className="text-neutral-400">Screen Locked</p>
@@ -64,11 +68,13 @@ const LockScreen = () => {
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-neutral-700 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-2xl font-bold text-white">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
+                {user?.name?.charAt(0).toUpperCase() || "U"}
               </span>
             </div>
-            <h2 className="text-xl font-semibold text-white">{user?.name || 'User'}</h2>
-            <p className="text-sm text-neutral-400">{user?.email || ''}</p>
+            <h2 className="text-xl font-semibold text-white">
+              {user?.name || "User"}
+            </h2>
+            <p className="text-sm text-neutral-400">{user?.email || ""}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,7 +100,7 @@ const LockScreen = () => {
               disabled={loading}
               className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Unlocking...' : 'Unlock'}
+              {loading ? "Unlocking..." : "Unlock"}
             </motion.button>
           </form>
 
@@ -111,4 +117,3 @@ const LockScreen = () => {
 };
 
 export default LockScreen;
-

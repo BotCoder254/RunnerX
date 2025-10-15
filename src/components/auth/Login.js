@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, Lock, Activity } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Mail, Lock } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { toast } from "react-toastify";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -15,17 +15,17 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error('Please fill in all fields');
+      toast.error("Please fill in all fields");
       return;
     }
 
     setLoading(true);
     try {
       await login(email, password);
-      toast.success('Welcome back!');
-      navigate('/dashboard');
+      toast.success("Welcome back!");
+      navigate("/dashboard");
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Invalid credentials');
+      toast.error(error.response?.data?.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
@@ -43,10 +43,14 @@ const Login = () => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg"
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="inline-flex items-center justify-center mb-4"
           >
-            <Activity className="w-8 h-8 text-white" strokeWidth={2.5} />
+            <img
+              src="/runnerx.png"
+              alt="RunnerX Logo"
+              className="w-20 h-20 object-contain"
+            />
           </motion.div>
           <h1 className="text-4xl font-bold text-neutral-900 dark:text-white mb-2">
             RunnerX
@@ -108,13 +112,13 @@ const Login = () => {
               disabled={loading}
               className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary-500/30"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? "Signing in..." : "Sign In"}
             </motion.button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-neutral-600 dark:text-neutral-400">
-              Don't have an account?{' '}
+              Don't have an account?{" "}
               <Link
                 to="/register"
                 className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
@@ -130,4 +134,3 @@ const Login = () => {
 };
 
 export default Login;
-

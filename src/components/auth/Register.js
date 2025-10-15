@@ -1,44 +1,44 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, Lock, User, Activity } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Mail, Lock, User } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { toast } from "react-toastify";
 
 const Register = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!name || !email || !password || !confirmPassword) {
-      toast.error('Please fill in all fields');
+      toast.error("Please fill in all fields");
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error("Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error("Password must be at least 6 characters");
       return;
     }
 
     setLoading(true);
     try {
       await register(email, password, name);
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
+      toast.error(error.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -56,10 +56,14 @@ const Register = () => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg"
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="inline-flex items-center justify-center mb-4"
           >
-            <Activity className="w-8 h-8 text-white" strokeWidth={2.5} />
+            <img
+              src="/runnerx.png"
+              alt="RunnerX Logo"
+              className="w-20 h-20 object-contain"
+            />
           </motion.div>
           <h1 className="text-4xl font-bold text-neutral-900 dark:text-white mb-2">
             RunnerX
@@ -155,13 +159,13 @@ const Register = () => {
               disabled={loading}
               className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary-500/30"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? "Creating account..." : "Create Account"}
             </motion.button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-neutral-600 dark:text-neutral-400">
-              Already have an account?{' '}
+              Already have an account?{" "}
               <Link
                 to="/login"
                 className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
@@ -177,4 +181,3 @@ const Register = () => {
 };
 
 export default Register;
-
