@@ -32,6 +32,7 @@ func MonitorRoutes(router *gin.RouterGroup, db *gorm.DB) {
 	router.GET("/monitor/:id/stats", monitorController.GetMonitorStats)
 	router.GET("/monitor/:id/history", monitorController.GetMonitorHistory)
     router.GET("/monitor/:id/snapshot", monitorController.GetMonitorSnapshot)
+	router.GET("/monitor/:id/health", monitorController.GetMonitorHealth)
 }
 
 func NotificationRoutes(router *gin.RouterGroup, db *gorm.DB) {
@@ -75,6 +76,21 @@ func SnapshotsRoutes(router *gin.RouterGroup, db *gorm.DB) {
 func IncidentsRoutes(router *gin.RouterGroup, db *gorm.DB) {
     ic := controllers.NewIncidentsController(db)
     router.GET("/incidents/:serverId", ic.Get)
+    router.POST("/incidents/summary", ic.GenerateSummary)
+}
+
+func SLARoutes(router *gin.RouterGroup, db *gorm.DB) {
+    sc := controllers.NewSLAController(db)
+    router.GET("/sla", sc.GetSLAReports)
+    router.GET("/sla/:monitorId", sc.GetMonitorSLAReports)
+    router.POST("/sla/generate", sc.GenerateSLAReports)
+}
+
+func CommandRoutes(router *gin.RouterGroup, db *gorm.DB, commandService *services.CommandService) {
+    cc := controllers.NewCommandController(db, commandService)
+    router.POST("/commands/execute", cc.ExecuteCommand)
+    router.GET("/commands/history", cc.GetCommandHistory)
+    router.GET("/commands/available", cc.GetAvailableCommands)
 }
 
 func PublicRoutes(router *gin.RouterGroup, db *gorm.DB) {}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 	"runnerx/config"
 	"runnerx/database"
 	"runnerx/middleware"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/go-co-op/gocron"
 )
 
 func main() {
@@ -42,6 +44,19 @@ func main() {
 
 	systemMoodService := services.NewSystemMoodService(db, hub)
 	go systemMoodService.Start()
+
+	// Start SLA scheduler
+	slaService := services.NewSLAService(db)
+	scheduler := gocron.NewScheduler(time.UTC)
+	scheduler.Every(1).Day().At("00:05").Do(func() {
+		if err := slaService.GenerateDailySLAReports(); err != nil {
+			log.Printf("Failed to generate SLA reports: %v", err)
+		}
+	})
+	scheduler.StartAsync()
+
+	// Initialize command service
+	commandService := services.NewCommandService(db, hub)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -79,6 +94,8 @@ func main() {
 		routes.ScreenshotsRoutes(protected, db)
 		routes.SnapshotsRoutes(protected, db)
 		routes.IncidentsRoutes(protected, db)
+		routes.SLARoutes(protected, db)
+		routes.CommandRoutes(protected, db, commandService)
 	}
 
 	// Public routes (no auth)

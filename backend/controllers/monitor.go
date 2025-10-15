@@ -3,12 +3,14 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"runnerx/middleware"
 	"runnerx/models"
+	"runnerx/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -201,14 +203,8 @@ func (mc *MonitorController) CreateMonitor(c *gin.Context) {
 		return
 	}
 
-	// Validate headers JSON if provided
-	if req.HeadersJSON != "" {
-		var headers map[string]string
-		if err := json.Unmarshal([]byte(req.HeadersJSON), &headers); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid headers JSON format"})
-			return
-		}
-	}
+	// Create monitoring config service
+	configService := services.NewMonitoringConfigService(mc.DB)
 
 	monitor := models.Monitor{
 		UserID:          userID,
@@ -224,20 +220,49 @@ func (mc *MonitorController) CreateMonitor(c *gin.Context) {
 		Status:          "pending",
 	}
 
+	// Set defaults if not provided
 	if monitor.Method == "" {
 		monitor.Method = "GET"
 	}
-
-	if monitor.Timeout == 0 {
-		monitor.Timeout = 10
+	if monitor.IntervalSeconds == 0 {
+		monitor.IntervalSeconds = configService.GetOptimalInterval(monitor.Type)
 	}
+	if monitor.Timeout == 0 {
+		monitor.Timeout = configService.GetOptimalTimeout(monitor.Type)
+	}
+
+	// Validate monitor configuration
+	if err := configService.ValidateMonitorConfig(&monitor); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Test the monitor connection before saving
+	isOnline, errorMsg, latencyMs, err := configService.TestMonitorConnection(&monitor)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to test connection: %v", err)})
+		return
+	}
+
+	// Log the test result
+	configService.LogMonitorEvent(0, "connection_test", fmt.Sprintf("Test result: %v, Latency: %dms, Error: %s", isOnline, latencyMs, errorMsg))
 
 	if err := mc.DB.Create(&monitor).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create monitor"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, monitor)
+	// Return monitor with test results
+	response := gin.H{
+		"monitor": monitor,
+		"test_result": gin.H{
+			"is_online":   isOnline,
+			"latency_ms":  latencyMs,
+			"error_msg":   errorMsg,
+		},
+	}
+
+	c.JSON(http.StatusCreated, response)
 }
 
 func (mc *MonitorController) UpdateMonitor(c *gin.Context) {
@@ -378,14 +403,31 @@ func (mc *MonitorController) TestMonitor(c *gin.Context) {
 		return
 	}
 
-	// Perform test check
+	// Perform test check with improved error handling
 	startTime := time.Now()
 	var status string
 	var statusCode int
 	var errorMsg string
+	var latencyMs int64
 
+	// Create HTTP client with proper configuration
 	client := &http.Client{
 		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
 	}
 
 	method := req.Method
@@ -402,6 +444,11 @@ func (mc *MonitorController) TestMonitor(c *gin.Context) {
 		return
 	}
 
+	// Add headers
+	httpReq.Header.Set("User-Agent", "RunnerX-Monitor/1.0")
+	httpReq.Header.Set("Accept", "*/*")
+	httpReq.Header.Set("Connection", "close")
+
 	// Add custom headers
 	if req.HeadersJSON != "" {
 		var headers map[string]string
@@ -412,10 +459,8 @@ func (mc *MonitorController) TestMonitor(c *gin.Context) {
 		}
 	}
 
-	httpReq.Header.Set("User-Agent", "RunnerX-Monitor/1.0")
-
 	resp, err := client.Do(httpReq)
-	latencyMs := time.Since(startTime).Milliseconds()
+	latencyMs = time.Since(startTime).Milliseconds()
 
 	if err != nil {
 		status = "down"
@@ -434,7 +479,7 @@ func (mc *MonitorController) TestMonitor(c *gin.Context) {
 		status = "up"
 	} else {
 		status = "down"
-		errorMsg = fmt.Sprintf("HTTP %d", statusCode)
+		errorMsg = fmt.Sprintf("HTTP %d: %s", statusCode, resp.Status)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -443,4 +488,28 @@ func (mc *MonitorController) TestMonitor(c *gin.Context) {
 		"latency_ms":  latencyMs,
 		"error":       errorMsg,
 	})
+}
+
+// GetMonitorHealth provides detailed health status for a monitor
+func (mc *MonitorController) GetMonitorHealth(c *gin.Context) {
+	userID, _ := middleware.GetUserID(c)
+	id := c.Param("id")
+
+	var monitor models.Monitor
+	if err := mc.DB.Where("id = ? AND user_id = ?", id, userID).First(&monitor).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Monitor not found"})
+		return
+	}
+
+	// Create monitoring config service
+	configService := services.NewMonitoringConfigService(mc.DB)
+
+	// Get health status
+	healthStatus, err := configService.GetMonitorHealthStatus(monitor.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get health status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, healthStatus)
 }

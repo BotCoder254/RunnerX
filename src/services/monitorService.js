@@ -61,6 +61,11 @@ export const monitorService = {
     return response.data;
   },
 
+  async getIncidents(monitorId) {
+    const response = await api.get(`/incidents/${monitorId}`);
+    return response.data;
+  },
+
   // Save draft to localStorage
   saveDraft(draft) {
     localStorage.setItem('monitor_draft', JSON.stringify(draft));

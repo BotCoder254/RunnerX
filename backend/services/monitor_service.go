@@ -1,8 +1,12 @@
 package services
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os/exec"
 	"runnerx/models"
@@ -10,9 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"io"
-	"bytes"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -78,8 +81,13 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 		status, latencyMs, errorMsg = ms.checkPing(monitor)
 	case "tcp":
 		status, latencyMs, errorMsg = ms.checkTCP(monitor)
+	case "dns":
+		status, latencyMs, errorMsg = ms.checkDNS(monitor)
 	default:
-		log.Printf("Unknown monitor type: %s", monitor.Type)
+		logrus.WithFields(logrus.Fields{
+			"monitor_id": monitor.ID,
+			"type":       monitor.Type,
+		}).Error("Unknown monitor type")
 		return
 	}
 
@@ -229,8 +237,34 @@ func (ms *MonitorService) updateLastNotificationTime(monitorID uint) {
 }
 
 func (ms *MonitorService) checkHTTP(monitor *models.Monitor) (string, int64, int, string) {
+	// Create context with timeout
+	timeout := time.Duration(monitor.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Create HTTP client with proper configuration
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Allow up to 10 redirects
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
 	}
 
 	method := monitor.Method
@@ -238,38 +272,82 @@ func (ms *MonitorService) checkHTTP(monitor *models.Monitor) (string, int64, int
 		method = "GET"
 	}
 
-    req, err := http.NewRequest(method, monitor.Endpoint, nil)
+	// Create request with context
+	req, err := http.NewRequestWithContext(ctx, method, monitor.Endpoint, nil)
 	if err != nil {
-		return "down", 0, 0, err.Error()
+		logrus.WithFields(logrus.Fields{
+			"monitor_id": monitor.ID,
+			"endpoint":   monitor.Endpoint,
+			"error":      err.Error(),
+		}).Error("Failed to create HTTP request")
+		return "down", 0, 0, fmt.Sprintf("Invalid endpoint: %v", err)
 	}
 
-	// Add custom headers if provided
-	// Note: In production, parse monitor.HeadersJSON properly
+	// Add headers
 	req.Header.Set("User-Agent", "RunnerX-Monitor/1.0")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Connection", "close")
+
+	// Add custom headers if provided
+	if monitor.HeadersJSON != "" {
+		var headers map[string]string
+		if err := json.Unmarshal([]byte(monitor.HeadersJSON), &headers); err == nil {
+			for key, value := range headers {
+				req.Header.Set(key, value)
+			}
+		}
+	}
 
 	startTime := time.Now()
-    resp, err := client.Do(req)
+	resp, err := client.Do(req)
 	latencyMs := time.Since(startTime).Milliseconds()
 
-    if err != nil {
-        return "down", latencyMs, 0, err.Error()
-    }
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"monitor_id": monitor.ID,
+			"endpoint":   monitor.Endpoint,
+			"latency_ms": latencyMs,
+			"error":      err.Error(),
+		}).Warn("HTTP check failed")
+		return "down", latencyMs, 0, err.Error()
+	}
 	defer resp.Body.Close()
 
-    if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-        // Capture a small safe snapshot body (truncate to 1KB) for HTTP monitors
-        var buf bytes.Buffer
-        limited := io.LimitReader(resp.Body, 1024)
-        _, _ = io.Copy(&buf, limited)
-        body := sanitizeSnapshot(buf.String())
-        // Rewind not needed as we already closed later; store body in error field for simplicity
-        if body != "" {
-            // no-op here; snapshot saved via Check fields below if needed
-        }
-        return "up", latencyMs, resp.StatusCode, body
-    }
+	// Read response body (limited) for better error reporting
+	var bodyPreview string
+	if resp.Body != nil {
+		bodyBytes := make([]byte, 512) // Read first 512 bytes
+		n, _ := io.ReadFull(resp.Body, bodyBytes)
+		if n > 0 {
+			bodyPreview = string(bodyBytes[:n])
+		}
+	}
 
-    return "down", latencyMs, resp.StatusCode, fmt.Sprintf("Status code: %d", resp.StatusCode)
+	// Determine status based on response code
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+		logrus.WithFields(logrus.Fields{
+			"monitor_id":  monitor.ID,
+			"endpoint":    monitor.Endpoint,
+			"status_code": resp.StatusCode,
+			"latency_ms":  latencyMs,
+		}).Info("HTTP check successful")
+		return "up", latencyMs, resp.StatusCode, bodyPreview
+	}
+
+	errorMsg := fmt.Sprintf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	if bodyPreview != "" {
+		errorMsg += fmt.Sprintf(" - %s", strings.TrimSpace(bodyPreview))
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"monitor_id":  monitor.ID,
+		"endpoint":    monitor.Endpoint,
+		"status_code": resp.StatusCode,
+		"latency_ms":  latencyMs,
+		"error":       errorMsg,
+	}).Warn("HTTP check failed with error status")
+
+	return "down", latencyMs, resp.StatusCode, errorMsg
 }
 
 func (ms *MonitorService) checkPing(monitor *models.Monitor) (string, int64, string) {
@@ -281,13 +359,35 @@ func (ms *MonitorService) checkPing(monitor *models.Monitor) (string, int64, str
 	endpoint = strings.Split(endpoint, "/")[0]
 	endpoint = strings.Split(endpoint, ":")[0]
 
-	cmd := exec.Command("ping", "-c", "1", "-W", "5", endpoint)
+	// Create context with timeout
+	timeout := time.Duration(monitor.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Use ping command with proper timeout
+	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", "5", endpoint)
 	err := cmd.Run()
 	latencyMs := time.Since(startTime).Milliseconds()
 
-    if err != nil {
-        return "down", latencyMs, err.Error()
-    }
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"monitor_id": monitor.ID,
+			"endpoint":   endpoint,
+			"latency_ms": latencyMs,
+			"error":      err.Error(),
+		}).Warn("Ping check failed")
+		return "down", latencyMs, err.Error()
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"monitor_id": monitor.ID,
+		"endpoint":   endpoint,
+		"latency_ms": latencyMs,
+	}).Info("Ping check successful")
 
 	return "up", latencyMs, ""
 }
@@ -295,19 +395,93 @@ func (ms *MonitorService) checkPing(monitor *models.Monitor) (string, int64, str
 func (ms *MonitorService) checkTCP(monitor *models.Monitor) (string, int64, string) {
 	startTime := time.Now()
 	
-	// Simple TCP connection check would go here
-	// For now, treating it similar to HTTP
-	client := &http.Client{
-		Timeout: 10 * time.Second,
+	// Extract host and port from endpoint
+	endpoint := strings.TrimPrefix(monitor.Endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+	endpoint = strings.Split(endpoint, "/")[0]
+	
+	// Default port if not specified
+	if !strings.Contains(endpoint, ":") {
+		endpoint += ":80"
 	}
 
-	resp, err := client.Get(monitor.Endpoint)
+	// Create context with timeout
+	timeout := time.Duration(monitor.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	
+	// Attempt TCP connection
+	conn, err := net.DialTimeout("tcp", endpoint, timeout)
 	latencyMs := time.Since(startTime).Milliseconds()
 
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"monitor_id": monitor.ID,
+			"endpoint":   endpoint,
+			"latency_ms": latencyMs,
+			"error":      err.Error(),
+		}).Warn("TCP check failed")
 		return "down", latencyMs, err.Error()
 	}
-	defer resp.Body.Close()
+	defer conn.Close()
+
+	logrus.WithFields(logrus.Fields{
+		"monitor_id": monitor.ID,
+		"endpoint":   endpoint,
+		"latency_ms": latencyMs,
+	}).Info("TCP check successful")
+
+	return "up", latencyMs, ""
+}
+
+func (ms *MonitorService) checkDNS(monitor *models.Monitor) (string, int64, string) {
+	startTime := time.Now()
+	
+	// Extract hostname from endpoint
+	hostname := strings.TrimPrefix(monitor.Endpoint, "http://")
+	hostname = strings.TrimPrefix(hostname, "https://")
+	hostname = strings.Split(hostname, "/")[0]
+	hostname = strings.Split(hostname, ":")[0]
+
+	// Create context with timeout
+	timeout := time.Duration(monitor.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Perform DNS lookup
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: timeout,
+			}
+			return d.DialContext(ctx, network, address)
+		},
+	}
+
+	_, err := resolver.LookupHost(ctx, hostname)
+	latencyMs := time.Since(startTime).Milliseconds()
+
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"monitor_id": monitor.ID,
+			"hostname":   hostname,
+			"latency_ms": latencyMs,
+			"error":      err.Error(),
+		}).Warn("DNS check failed")
+		return "down", latencyMs, err.Error()
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"monitor_id": monitor.ID,
+		"hostname":   hostname,
+		"latency_ms": latencyMs,
+	}).Info("DNS check successful")
 
 	return "up", latencyMs, ""
 }

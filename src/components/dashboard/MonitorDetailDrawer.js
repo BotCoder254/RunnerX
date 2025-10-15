@@ -36,6 +36,8 @@ import { wsService } from "../../services/websocketService";
 import { screenshotsService } from "../../services/screenshotsService";
 import { snapshotsService } from "../../services/snapshotsService";
 import { incidentsService } from "../../services/incidentsService";
+import AISummary from '../common/AISummary';
+import SLACard from '../common/SLACard';
 
 ChartJS.register(
   CategoryScale,
@@ -101,12 +103,33 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
   const [screenshotPulse, setScreenshotPulse] = useState(false);
   const [hourlySnaps, setHourlySnaps] = useState([]);
   const [timeline, setTimeline] = useState([]);
+  const [showAISummary, setShowAISummary] = useState(false);
+  const [showSLACard, setShowSLACard] = useState(false);
+  const [latestIncidentId, setLatestIncidentId] = useState(null);
 
   // Derive an incident id from monitor context (simple mapping per monitor)
   useEffect(() => {
     if (!monitor) return;
     setIncidentId(`monitor-${monitor.id}`);
   }, [monitor]);
+
+  // Fetch latest incident for AI summary
+  useEffect(() => {
+    const fetchLatestIncident = async () => {
+      try {
+        const incidents = await monitorService.getIncidents(monitor.id);
+        if (incidents && incidents.length > 0) {
+          setLatestIncidentId(incidents[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch incidents:', error);
+      }
+    };
+
+    if (monitor?.id) {
+      fetchLatestIncident();
+    }
+  }, [monitor?.id]);
 
   // Fetch insights when tab active or query changes
   useEffect(() => {
@@ -680,6 +703,76 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                 <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
                   Trend: {rootCause?.summary?.trend || "inconclusive"}
                 </div>
+              </div>
+
+              {/* AI Summary Section */}
+              <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                    AI Incident Summary
+                  </h3>
+                  <button
+                    onClick={() => setShowAISummary(!showAISummary)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    {showAISummary ? 'Hide' : 'Show'} Summary
+                  </button>
+                </div>
+                
+                <AnimatePresence>
+                  {showAISummary && latestIncidentId && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <AISummary 
+                        incidentId={latestIncidentId} 
+                        isMobile={false}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                {!latestIncidentId && showAISummary && (
+                  <div className="text-center py-8 text-neutral-500">
+                    <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No incidents found for this monitor</p>
+                  </div>
+                )}
+              </div>
+
+              {/* SLA Section */}
+              <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                    Service Level Agreement
+                  </h3>
+                  <button
+                    onClick={() => setShowSLACard(!showSLACard)}
+                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    {showSLACard ? 'Hide' : 'Show'} SLA
+                  </button>
+                </div>
+                
+                <AnimatePresence>
+                  {showSLACard && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <SLACard 
+                        monitorId={monitor.id}
+                        monitorName={monitor.name}
+                        isMobile={false}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>

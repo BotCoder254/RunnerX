@@ -14,6 +14,7 @@ import {
   useUpdateUserPreferences,
 } from "../../hooks/useUserPreferences";
 import { Activity, AlertCircle } from "lucide-react";
+import CommandConsole from "../common/CommandConsole";
 
 const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -173,6 +174,11 @@ const Dashboard = () => {
         <main className="flex-1 p-4 lg:p-6 relative z-10">
           {/* Stats Overview */}
           <StatsOverview monitors={monitors || []} />
+
+          {/* Command Console */}
+          <div className="mt-6">
+            <CommandConsole isMobile={false} />
+          </div>
 
           {/* Monitors Grid */}
           <div className="mt-6">
