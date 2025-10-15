@@ -19,14 +19,16 @@ import (
 type MonitorService struct {
 	db  *gorm.DB
 	hub *ws.Hub
-    ae  *AutomationEngine
+    li  *LogInsightsService
+    ins *IncidentService
 }
 
 func NewMonitorService(db *gorm.DB, hub *ws.Hub) *MonitorService {
     return &MonitorService{
         db:  db,
         hub: hub,
-        ae:  NewAutomationEngine(db, hub),
+        li:  NewLogInsightsService(db, hub),
+        ins: NewIncidentService(db),
     }
 }
 
@@ -118,7 +120,27 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 
 	ms.hub.BroadcastToUser(monitor.UserID, "monitor:update", updateData)
 
-	// Handle status change
+    // Capture screenshot on downtime (best-effort)
+    if status == "down" {
+        go ms.captureDowntimeScreenshot(monitor)
+    }
+
+    // Record a log insight entry only when the check failed
+    if status == "down" && ms.li != nil {
+        msg := errorMsg
+        if msg == "" && statusCode >= 400 {
+            msg = fmt.Sprintf("HTTP %d", statusCode)
+        }
+        if msg != "" {
+			incidentID := deriveIncidentID(monitor.ID)
+            userID := monitor.UserID
+            mid := monitor.ID
+            _ = ms.li.RecordLog(userID, incidentID, &mid, "error", msg)
+            if ms.ins != nil { ms.ins.RecordFailure(monitor.UserID, monitor.ID, latencyMs, statusCode, errorMsg) }
+        }
+    }
+
+    // Handle status change
 	if oldStatus != status && oldStatus != "pending" {
         // Broadcast status change
 		statusChangeData := map[string]interface{}{
@@ -129,10 +151,7 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 		}
 		ms.hub.BroadcastToUser(monitor.UserID, "monitor:status_change", statusChangeData)
 
-        // Evaluate automation rules
-        if ms.ae != nil {
-            ms.ae.EvaluateRules(monitor.UserID, monitor.ID, status, oldStatus)
-        }
+        // Automation removed
 
 		// Create notification with burst suppression
 		shouldCreateNotification := ms.shouldCreateNotification(monitor.ID, status)
@@ -171,6 +190,19 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 	}
 
 	log.Printf("Checked %s (%s): %s - %dms", monitor.Name, monitor.Type, status, latencyMs)
+}
+
+// deriveIncidentID produces a stable incident scope per monitor
+func deriveIncidentID(monitorID uint) string { return fmt.Sprintf("monitor-%d", monitorID) }
+
+func (ms *MonitorService) captureDowntimeScreenshot(m *models.Monitor) {
+    if m.Type != "http" {
+        return
+    }
+    ss := NewScreenshotService(ms.db, ms.hub)
+    if err := ss.CaptureAndStore(m.UserID, deriveIncidentID(m.ID), m.Endpoint, m.ID); err != nil {
+        log.Printf("Screenshot capture failed: %v", err)
+    }
 }
 
 // Burst suppression - track last notification time per monitor

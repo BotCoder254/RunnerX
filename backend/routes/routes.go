@@ -1,11 +1,12 @@
 package routes
 
 import (
-	"runnerx/config"
-	"runnerx/controllers"
+    "runnerx/config"
+    "runnerx/controllers"
+    "runnerx/services"
 
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+    "github.com/gin-gonic/gin"
+    "gorm.io/gorm"
 )
 
 func AuthRoutes(router *gin.RouterGroup, db *gorm.DB) {
@@ -51,21 +52,30 @@ func UserRoutes(router *gin.RouterGroup, db *gorm.DB) {
 	router.PUT("/user/preferences", userController.UpdateUserPreferences)
 }
 
-func AutomationRoutes(router *gin.RouterGroup, db *gorm.DB) {
-    automationController := controllers.NewAutomationController(db)
-    router.GET("/automation/rules", automationController.List)
-    router.POST("/automation/rules", automationController.Create)
-    router.DELETE("/automation/rules/:id", automationController.Delete)
+// Automation routes removed per spec
+
+// Status page routes removed per spec
+
+func LogsRoutes(router *gin.RouterGroup, db *gorm.DB, svc *services.LogInsightsService) {
+    logsController := controllers.NewLogsController(db, svc)
+    router.GET("/logs/:incidentId", logsController.GetInsights)
 }
 
-func StatusPageRoutes(router *gin.RouterGroup, db *gorm.DB) {
-    spController := controllers.NewStatusPageController(db)
-    // Authenticated create/list under /api
-    router.POST("/status_page", spController.Create)
+func ScreenshotsRoutes(router *gin.RouterGroup, db *gorm.DB) {
+    sc := controllers.NewScreenshotsController(db)
+    router.GET("/screenshots/:incidentId", sc.GetLatest)
+    router.POST("/screenshots/:incidentId/capture", sc.CaptureLatest)
 }
 
-func PublicRoutes(router *gin.RouterGroup, db *gorm.DB) {
-    spController := controllers.NewStatusPageController(db)
-    router.GET("/status/:slug", spController.GetBySlug)
+func SnapshotsRoutes(router *gin.RouterGroup, db *gorm.DB) {
+    s := controllers.NewSnapshotsController(db)
+    router.GET("/snapshots/:serverId", s.Get)
 }
+
+func IncidentsRoutes(router *gin.RouterGroup, db *gorm.DB) {
+    ic := controllers.NewIncidentsController(db)
+    router.GET("/incidents/:serverId", ic.Get)
+}
+
+func PublicRoutes(router *gin.RouterGroup, db *gorm.DB) {}
 

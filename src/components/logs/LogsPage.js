@@ -11,9 +11,11 @@ const levelColors = {
 };
 
 const LogsPage = () => {
+  const { data: monitors } = useMonitors();
   const [logs, setLogs] = useState([]);
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState('all');
+  const [selected, setSelected] = useState({});
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -31,11 +33,22 @@ const LogsPage = () => {
     const matchLevel = level === 'all' || String(l.level).toLowerCase() === level;
     const q = query.trim().toLowerCase();
     const matchQuery = !q || JSON.stringify(l).toLowerCase().includes(q);
-    return matchLevel && matchQuery;
-  }), [logs, query, level]);
+    const hasSelection = Object.values(selected).some(Boolean);
+    const matchMonitor = !hasSelection || (l.monitor_id && selected[String(l.monitor_id)]);
+    return matchLevel && matchQuery && matchMonitor;
+  }), [logs, query, level, selected]);
 
-  const { data: monitors } = useMonitors();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const toggleSelect = (monitorId, checked) => {
+    setSelected((s) => ({ ...s, [String(monitorId)]: checked }));
+  };
+
+  const monitorMap = useMemo(() => {
+    const m = {};
+    (monitors || []).forEach((mm) => { m[String(mm.id)] = mm; });
+    return m;
+  }, [monitors]);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
@@ -58,15 +71,42 @@ const LogsPage = () => {
           <option value="error">Error</option>
         </select>
       </div>
-      <div className="font-mono text-sm p-4 space-y-1 text-neutral-100 bg-neutral-950 min-h-[calc(100vh-4rem)] overflow-y-auto">
-        {filtered.map((l, i) => (
-          <div key={i} className="whitespace-pre-wrap break-words">
-            <span className="text-neutral-500">[{new Date(l.ts).toLocaleTimeString()}]</span>{' '}
-            <span className={levelColors[String(l.level)] || 'text-neutral-300'}>{String(l.level).toUpperCase()}</span>{' '}
-            <span>{l.message}</span>
-            {l.monitor_id ? <span className="text-neutral-500"> · monitor {l.monitor_id}</span> : null}
-          </div>
-        ))}
+      <div className="font-mono text-sm p-4 space-y-2 text-neutral-100 bg-neutral-950 min-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="flex flex-wrap gap-2 mb-2">
+          <label className={`flex items-center gap-2 px-2 py-1 rounded-md ${Object.values(selected).some(Boolean) ? 'bg-neutral-800 text-neutral-200' : 'bg-primary-600 text-white'}`}>
+            <input type="checkbox" className="accent-primary-600" checked={!Object.values(selected).some(Boolean)} onChange={() => setSelected({})} />
+            <div className="w-5 h-5 rounded-full bg-neutral-700 flex items-center justify-center text-[10px]">A</div>
+            <span className="text-xs truncate max-w-[140px]">All Monitors</span>
+          </label>
+          {(monitors || []).map((m) => {
+            const checked = !!selected[String(m.id)];
+            return (
+              <label key={m.id} className={`flex items-center gap-2 px-2 py-1 rounded-md ${checked ? 'bg-primary-600 text-white' : 'bg-neutral-800 text-neutral-200'}`}>
+                <input type="checkbox" className="accent-primary-600" checked={checked} onChange={(e) => toggleSelect(m.id, e.target.checked)} />
+                <div className="w-5 h-5 rounded-full bg-neutral-700 flex items-center justify-center text-[10px]">
+                  {(m.name || '').charAt(0).toUpperCase()}
+                </div>
+                <span className="text-xs truncate max-w-[140px]">{m.name}</span>
+              </label>
+            );
+          })}
+        </div>
+        {filtered.map((l, i) => {
+          const m = l.monitor_id ? monitorMap[String(l.monitor_id)] : null;
+          return (
+            <div key={i} className="whitespace-pre-wrap break-words flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] mt-0.5">
+                {(m?.name || '').charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <span className="text-neutral-500">[{new Date(l.ts).toLocaleTimeString()}]</span>{' '}
+                <span className={levelColors[String(l.level)] || 'text-neutral-300'}>{String(l.level).toUpperCase()}</span>{' '}
+                <span>{l.message}</span>
+                {l.monitor_id ? <span className="text-neutral-500"> · monitor {l.monitor_id}</span> : null}
+              </div>
+            </div>
+          );
+        })}
         <div ref={endRef} />
       </div>
         </main>

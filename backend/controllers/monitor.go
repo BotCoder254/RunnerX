@@ -68,30 +68,30 @@ func (mc *MonitorController) GetMonitor(c *gin.Context) {
 
 // GetMonitorSnapshot returns last stored response snapshot for HTTP monitors
 func (mc *MonitorController) GetMonitorSnapshot(c *gin.Context) {
-    userID, _ := middleware.GetUserID(c)
-    id := c.Param("id")
+	userID, _ := middleware.GetUserID(c)
+	id := c.Param("id")
 
-    var monitor models.Monitor
-    if err := mc.DB.Where("id = ? AND user_id = ?", id, userID).First(&monitor).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "Monitor not found"})
-        return
-    }
+	var monitor models.Monitor
+	if err := mc.DB.Where("id = ? AND user_id = ?", id, userID).First(&monitor).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Monitor not found"})
+		return
+	}
 
-    var check models.Check
-    // last successful HTTP check with snapshot fields (if present in model)
-    if err := mc.DB.Where("monitor_id = ? AND status = ?", monitor.ID, "up").Order("created_at DESC").First(&check).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "No snapshot available"})
-        return
-    }
+	var check models.Check
+	// last successful HTTP check with snapshot fields (if present in model)
+	if err := mc.DB.Where("monitor_id = ? AND status = ?", monitor.ID, "up").Order("created_at DESC").First(&check).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No snapshot available"})
+		return
+	}
 
-    // For simplicity, reuse ErrorMsg if snapshot not yet stored; in real impl, separate fields
-    c.JSON(http.StatusOK, gin.H{
-        "status_code": check.StatusCode,
-        "latency_ms": check.LatencyMs,
-        "headers": map[string]string{},
-        "body_preview": check.ErrorMsg,
-        "timestamp": check.CreatedAt,
-    })
+	// For simplicity, reuse ErrorMsg if snapshot not yet stored; in real impl, separate fields
+	c.JSON(http.StatusOK, gin.H{
+		"status_code":  check.StatusCode,
+		"latency_ms":   check.LatencyMs,
+		"headers":      map[string]string{},
+		"body_preview": check.ErrorMsg,
+		"timestamp":    check.CreatedAt,
+	})
 }
 
 // GetMonitorForecast returns recent forecast entries for a monitor

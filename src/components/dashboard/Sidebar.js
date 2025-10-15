@@ -167,7 +167,7 @@ const Sidebar = ({
                 <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-3">Navigate</h3>
                 <a href="/dashboard" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Dashboard</a>
                 <a href="/logs" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Logs</a>
-                <a href="/dashboard?section=automation" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Automation</a>
+                {/* <a href="/dashboard?section=automation" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Automation</a> */}
               </div>
 
               {/* Status Filters */}

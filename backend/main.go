@@ -31,10 +31,13 @@ func main() {
 
 	// Initialize monitor service with WebSocket hub
 	monitorService := services.NewMonitorService(db, hub)
+	logInsightsService := services.NewLogInsightsService(db, hub)
 	go monitorService.Start()
 
 	// Start analytics and system mood services
 	analyticsService := services.NewAnalyticsService(db, hub)
+	// Seed hourly snapshots once at startup for immediate UI
+	go func() { analyticsService.AggregateLastHour(); }()
 	go analyticsService.StartHourly()
 
 	systemMoodService := services.NewSystemMoodService(db, hub)
@@ -71,8 +74,11 @@ func main() {
 		routes.MonitorRoutes(protected, db)
 		routes.NotificationRoutes(protected, db)
 		routes.UserRoutes(protected, db)
-		routes.StatusPageRoutes(protected, db)
-		routes.AutomationRoutes(protected, db)
+		// Status page and automation removed per spec
+		routes.LogsRoutes(protected, db, logInsightsService)
+		routes.ScreenshotsRoutes(protected, db)
+		routes.SnapshotsRoutes(protected, db)
+		routes.IncidentsRoutes(protected, db)
 	}
 
 	// Public routes (no auth)

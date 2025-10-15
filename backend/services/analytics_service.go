@@ -3,6 +3,7 @@ package services
 import (
 	"log"
 	"math"
+    "sort"
 	"runnerx/models"
 	ws "runnerx/websocket"
 	"time"
@@ -81,6 +82,44 @@ func (as *AnalyticsService) runOnce() {
 			log.Printf("Analytics: failed to save forecast: %v", err)
 		}
 	}
+}
+
+// AggregateLastHour computes hourly performance snapshots for each monitor
+func (as *AnalyticsService) AggregateLastHour() {
+    cutoff := time.Now().Add(-1 * time.Hour)
+    var monitors []models.Monitor
+    if err := as.db.Find(&monitors).Error; err != nil { return }
+    for _, m := range monitors {
+        var checks []models.Check
+        if err := as.db.Where("monitor_id = ? AND created_at >= ?", m.ID, cutoff).Order("created_at DESC").Find(&checks).Error; err != nil {
+            continue
+        }
+        if len(checks) == 0 { continue }
+        total := float64(len(checks))
+        success := 0.0
+        latencies := make([]int64, 0, len(checks))
+        sum := 0.0
+        for _, c := range checks {
+            if c.Status == "up" { success++ }
+            latencies = append(latencies, c.LatencyMs)
+            sum += float64(c.LatencyMs)
+        }
+        avg := sum / total
+        // simple percentiles
+        sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+        p50 := float64(latencies[int(0.5*total)])
+        p95 := float64(latencies[int(0.95*total)-1])
+        snap := models.PerformanceSnapshot{
+            MonitorID:     m.ID,
+            UptimePercent: 100.0 * (success / total),
+            AvgLatencyMs:  avg,
+            CpuLoad:       0, // placeholder; integrate real host metrics if available
+            P50LatencyMs:  p50,
+            P95LatencyMs:  p95,
+            SuccessRatio:  success / total,
+        }
+        _ = as.db.Create(&snap).Error
+    }
 }
 
 func movingAverageLatency(checks []models.Check, window int) float64 {

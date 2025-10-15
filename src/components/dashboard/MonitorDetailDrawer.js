@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -31,6 +31,11 @@ import {
   getStatusLabel,
 } from "../../utils/formatters";
 import { STATUS_COLORS } from "../../utils/constants";
+import { logsService } from "../../services/logsService";
+import { wsService } from "../../services/websocketService";
+import { screenshotsService } from "../../services/screenshotsService";
+import { snapshotsService } from "../../services/snapshotsService";
+import { incidentsService } from "../../services/incidentsService";
 
 ChartJS.register(
   CategoryScale,
@@ -86,6 +91,89 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
       isMounted = false;
     };
   }, [monitor, isOpen]);
+
+  // Log Insights state
+  const [incidentId, setIncidentId] = useState("");
+  const [insights, setInsights] = useState([]);
+  const [insightsQuery, setInsightsQuery] = useState("");
+  const [selectedHashes, setSelectedHashes] = useState({});
+  const [screenshotUrl, setScreenshotUrl] = useState("");
+  const [screenshotPulse, setScreenshotPulse] = useState(false);
+  const [hourlySnaps, setHourlySnaps] = useState([]);
+  const [timeline, setTimeline] = useState([]);
+
+  // Derive an incident id from monitor context (simple mapping per monitor)
+  useEffect(() => {
+    if (!monitor) return;
+    setIncidentId(`monitor-${monitor.id}`);
+  }, [monitor]);
+
+  // Fetch insights when tab active or query changes
+  useEffect(() => {
+    if (!monitor || activeTab !== "logs") return;
+    let mounted = true;
+    logsService
+      .getInsights(incidentId, insightsQuery)
+      .then((data) => {
+        if (mounted) setInsights(data || []);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [monitor, activeTab, incidentId, insightsQuery]);
+
+  // Realtime updates via websocket
+  useEffect(() => {
+    if (!monitor) return;
+    const unsub = wsService.subscribe("logs:insight", (evt) => {
+      if (!evt || evt.incident_id !== incidentId) return;
+      if (activeTab !== "logs") return;
+      const item = evt.insight;
+      setInsights((prev) => {
+        const idx = prev.findIndex((x) => x.pattern_hash === item.pattern_hash);
+        if (idx >= 0) {
+          const copy = prev.slice();
+          copy[idx] = item;
+          return copy;
+        }
+        return [item, ...prev];
+      });
+    });
+    return () => unsub();
+  }, [monitor, incidentId, activeTab]);
+
+  // Load hourly performance snapshots when performance tab active
+  useEffect(() => {
+    if (!monitor || activeTab !== "performance") return;
+    let mounted = true;
+    snapshotsService.getRecent(monitor.id).then((data) => {
+      if (mounted) setHourlySnaps(data || []);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [monitor, activeTab]);
+
+  // Load incidents when timeline tab active
+  useEffect(() => {
+    if (!monitor || activeTab !== "timeline") return;
+    let mounted = true;
+    incidentsService.listForMonitor(monitor.id).then((items) => {
+      if (mounted) setTimeline(items || []);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [monitor, activeTab]);
+
+  // Listen for screenshot updates
+  useEffect(() => {
+    const unsub = wsService.subscribe("incident:screenshot", (evt) => {
+      if (evt?.incident_id === incidentId) {
+        setScreenshotUrl(`/api/screenshots/${encodeURIComponent(incidentId)}?t=${Date.now()}`);
+        setScreenshotPulse(true);
+        setTimeout(() => setScreenshotPulse(false), 1500);
+      }
+    });
+    return () => unsub();
+  }, [incidentId]);
 
   if (!monitor) return null;
 
@@ -217,13 +305,13 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
             {/* Tabs */}
             <div className="px-6 pt-4">
               <div className="flex gap-2">
-                {["performance", "snapshot"].map((t) => (
+                {["performance", "snapshot", "logs", "timeline"].map((t) => (
                   <button
                     key={t}
                     onClick={() => setActiveTab(t)}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium ${activeTab === t ? "bg-primary-600 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"}`}
                   >
-                    {t === "performance" ? "Performance" : "Snapshot"}
+                    {t === "performance" ? "Performance" : t === "snapshot" ? "Snapshot" : t === "logs" ? "Log Insights" : "Timeline"}
                   </button>
                 ))}
               </div>
@@ -395,6 +483,39 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                       )}
                     </div>
                   </div>
+
+                  {/* Hourly Snapshot Cards */}
+                  <div className="mt-4">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Hourly Snapshots</h3>
+                    <div className="flex gap-3 overflow-x-auto snap-x pb-2">
+                      {hourlySnaps.map((s, idx) => (
+                        <div key={idx} className="min-w-[220px] snap-start bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4 transition-transform hover:scale-[1.02]">
+                          <div className="text-xs text-neutral-500">{new Date(s.created_at).toLocaleString()}</div>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="text-[11px] text-neutral-500">Uptime</div>
+                              <div className="text-lg font-bold text-emerald-500">{(s.uptime_percent || 0).toFixed(1)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] text-neutral-500">Avg Lat.</div>
+                              <div className="text-lg font-bold text-neutral-200">{Math.round(s.avg_latency_ms || 0)}ms</div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] text-neutral-500">P50</div>
+                              <div className="text-sm font-semibold">{Math.round(s.p50_latency_ms || 0)}ms</div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] text-neutral-500">P95</div>
+                              <div className="text-sm font-semibold text-yellow-400">{Math.round(s.p95_latency_ms || 0)}ms</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {hourlySnaps.length === 0 && (
+                        <div className="text-sm text-neutral-500">No snapshots yet</div>
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -417,6 +538,103 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                           '<pre class="p-4 text-neutral-500">No snapshot</pre>'
                         }
                       />
+                    </div>
+                    <div className="mt-4 flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const blob = await screenshotsService.getLatestBlob(incidentId);
+                            const url = URL.createObjectURL(blob);
+                            setScreenshotUrl(url);
+                            setScreenshotPulse(true);
+                            setTimeout(() => setScreenshotPulse(false), 1500);
+                          } catch (e) {
+                            // If no screenshot yet, trigger capture and retry after a brief delay
+                            try {
+                              await screenshotsService.triggerCapture(incidentId);
+                              setTimeout(async () => {
+                                try {
+                                  const blob2 = await screenshotsService.getLatestBlob(incidentId);
+                                  const url2 = URL.createObjectURL(blob2);
+                                  setScreenshotUrl(url2);
+                                  setScreenshotPulse(true);
+                                  setTimeout(() => setScreenshotPulse(false), 1500);
+                                } catch {}
+                              }, 1500);
+                            } catch {}
+                          }
+                        }}
+                        className="px-3 py-2 rounded-md bg-neutral-900 text-neutral-100 hover:bg-neutral-800 flex items-center gap-2"
+                        title="Load latest downtime screenshot"
+                      >
+                        <svg className={`w-4 h-4 ${screenshotPulse ? 'animate-pulse text-primary-500' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                        Screenshot
+                      </button>
+                      {screenshotUrl && (
+                        <span className="text-xs text-neutral-500">Latest captured image below</span>
+                      )}
+                    </div>
+                    {screenshotUrl && (
+                      <div className="mt-3 overflow-hidden rounded-lg">
+                        <img
+                          key={screenshotUrl}
+                          src={screenshotUrl}
+                          alt="Downtime screenshot"
+                          className="w-full max-h-[60vh] object-contain opacity-0 animate-[fadein_400ms_ease_forwards]"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "logs" && (
+                <div>
+                  <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                      <input
+                        className="flex-1 px-3 py-2 rounded bg-neutral-800 text-neutral-100 font-mono"
+                        placeholder="Search summarized logs..."
+                        value={insightsQuery}
+                        onChange={(e) => setInsightsQuery(e.target.value)}
+                      />
+                      <div className="text-xs text-neutral-500">{insights.length} groups</div>
+                    </div>
+                    <div className="space-y-2">
+                      {insights.map((it, idx) => {
+                        const checked = !!selectedHashes[it.pattern_hash];
+                        return (
+                          <details key={it.pattern_hash} className="group bg-neutral-900 rounded-lg overflow-hidden">
+                            <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                className="accent-primary-600"
+                                checked={checked}
+                                onChange={(e) =>
+                                  setSelectedHashes((s) => ({ ...s, [it.pattern_hash]: e.target.checked }))
+                                }
+                              />
+                              {/* monitor logo placeholder circle */}
+                              <div className="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center text-xs">
+                                {(monitor.name || "").charAt(0).toUpperCase()}
+                              </div>
+                              <span className={`text-xs uppercase ${it.level === "error" ? "text-danger-400" : it.level === "warn" ? "text-yellow-400" : "text-emerald-400"}`}>
+                                {String(it.level || "info").toUpperCase()}
+                              </span>
+                              <span className="text-neutral-100 font-mono text-sm truncate flex-1">{it.pattern}</span>
+                              <span className="text-neutral-400 text-xs">×{it.count}</span>
+                            </summary>
+                            <div className="px-4 pb-4">
+                              <pre className="font-mono text-sm whitespace-pre-wrap text-neutral-300">{it.example}</pre>
+                            </div>
+                          </details>
+                        );
+                      })}
+                      {insights.length === 0 && (
+                        <div className="text-center py-10 text-neutral-500">
+                          No insights yet.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
