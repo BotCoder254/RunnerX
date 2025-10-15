@@ -1,70 +1,299 @@
-# Getting Started with Create React App
+# RunnerX 🚀
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern, self-hosted monitoring tool inspired by Uptime Kuma. Built with React, Go, Gin, and GORM.
 
-## Available Scripts
+![RunnerX](https://img.shields.io/badge/version-1.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-In the project directory, you can run:
+## ✨ Features
 
-### `npm start`
+### 🎨 Modern UI/UX
+- **Beautiful Dashboard** - Clean, professional interface with solid colors
+- **Dark Mode** - Full dark mode support with smooth transitions
+- **Waterlike Animations** - Real-time "waterlike" effects on monitor cards using Framer Motion
+- **Mobile Responsive** - Fully optimized for all screen sizes
+- **Real-time Updates** - Live status updates every 5 seconds
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### 🔐 Security & Authentication
+- **JWT Authentication** - Secure token-based authentication
+- **Single User Role** - Simplified user management with full privileges
+- **Auto-lock Screen** - Automatic locking after 30 minutes of inactivity
+- **Rate Limiting** - Protection against abuse (100 req/min per IP)
+- **Password Hashing** - bcrypt encryption for passwords
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 📊 Monitoring Features
+- **Multiple Monitor Types** - HTTP, Ping, TCP support
+- **Customizable Intervals** - From 30 seconds to 1 hour
+- **Status Tracking** - Real-time status (Online, Offline, Paused, Pending)
+- **Uptime Statistics** - Track uptime percentage and latency
+- **Historical Data** - View check history and trends
+- **Modern Charts** - Beautiful visualizations with Chart.js
+- **Tags & Filters** - Organize monitors with tags and filter by status
 
-### `npm test`
+### 🛠️ Technology Stack
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+**Frontend:**
+- React 19
+- Tailwind CSS (with dark mode)
+- Framer Motion (animations)
+- TanStack Query (data fetching)
+- Lucide Icons
+- React Toastify (notifications)
+- Chart.js (visualizations)
+- React Router (routing)
+- Axios (HTTP client)
 
-### `npm run build`
+**Backend:**
+- Go 1.21+
+- Gin (web framework)
+- GORM (ORM)
+- SQLite (database)
+- JWT (authentication)
+- bcrypt (password hashing)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🚀 Getting Started
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Prerequisites
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- Node.js 18+ and npm
+- Go 1.21+
+- SQLite3
 
-### `npm run eject`
+### Installation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+#### 1. Clone the repository
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+cd runnerx
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+#### 2. Setup Frontend
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+# Install dependencies
+npm install
 
-## Learn More
+# Start development server
+npm start
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+The frontend will run on `http://localhost:3000`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+#### 3. Setup Backend
 
-### Code Splitting
+```bash
+cd backend
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+# Download Go dependencies
+go mod download
 
-### Analyzing the Bundle Size
+# Create .env file
+cat > .env << EOF
+PORT=8080
+DATABASE_URL=./runnerx.db
+JWT_SECRET=$(openssl rand -hex 32)
+EOF
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+# Run the server
+go run main.go
+```
 
-### Making a Progressive Web App
+The backend will run on `http://localhost:8080`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### 🔧 Environment Variables
 
-### Advanced Configuration
+**Backend (.env):**
+```env
+PORT=8080
+DATABASE_URL=./runnerx.db
+JWT_SECRET=your-secret-key-change-in-production
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+**Frontend (.env):**
+```env
+REACT_APP_API_URL=http://localhost:8080/api
+```
 
-### Deployment
+## 📱 Usage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### 1. Register/Login
+- Open `http://localhost:3000`
+- Register a new account or login
+- You'll be redirected to the dashboard
 
-### `npm run build` fails to minify
+### 2. Add Monitors
+- Click "Add Monitor" button
+- Fill in monitor details:
+  - Name
+  - Type (HTTP, Ping, TCP)
+  - Endpoint/URL
+  - Check interval
+  - Optional: HTTP method, headers, tags
+- Click "Create Monitor"
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+### 3. Monitor Dashboard
+- View all monitors in a beautiful grid layout
+- Filter by status (All, Online, Offline, Paused, Pending)
+- Real-time status updates with waterlike animations
+- View uptime percentage and latency
+- Mini sparkline charts for quick trends
+
+### 4. Manage Monitors
+- Click on menu (⋮) for options:
+  - Pause/Resume monitoring
+  - Edit monitor settings
+  - Delete monitor
+
+### 5. Security Features
+- Auto-lock after 30 minutes of inactivity
+- Manual lock from user menu
+- Dark mode toggle in header
+
+## 🏗️ Project Structure
+
+```
+runnerx/
+├── backend/
+│   ├── config/           # Configuration
+│   ├── controllers/      # API controllers
+│   ├── database/         # Database setup
+│   ├── middleware/       # Auth & rate limiting
+│   ├── models/          # Data models
+│   ├── routes/          # API routes
+│   ├── services/        # Background monitoring
+│   ├── go.mod           # Go dependencies
+│   ├── main.go          # Entry point
+│   └── README.md
+│
+├── src/
+│   ├── components/
+│   │   ├── auth/        # Login, Register, LockScreen
+│   │   ├── common/      # ProtectedRoute
+│   │   └── dashboard/   # Dashboard components
+│   ├── contexts/        # Auth & Theme contexts
+│   ├── hooks/           # Custom React hooks
+│   ├── services/        # API service layer
+│   ├── utils/           # Constants & formatters
+│   ├── App.js           # Main app component
+│   └── index.js         # Entry point
+│
+├── public/              # Static assets
+├── package.json         # Frontend dependencies
+├── tailwind.config.js   # Tailwind configuration
+└── README.md           # This file
+```
+
+## 🎨 Color Palette
+
+**Light Mode:**
+- Primary: Blue (#0ea5e9)
+- Success: Green (#22c55e)
+- Danger: Red (#ef4444)
+- Warning: Amber (#f59e0b)
+- Neutral: Gray (#737373)
+
+**Dark Mode:**
+- Background: Near black (#0a0a0a)
+- Surface: Dark gray (#262626)
+- Text: White (#ffffff)
+- All status colors are adjusted for dark mode
+
+## 📊 API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Register user
+- `POST /api/auth/login` - Login user
+
+### Monitors (Protected)
+- `GET /api/monitors` - List all monitors
+- `GET /api/monitor/:id` - Get monitor details
+- `POST /api/monitor` - Create monitor
+- `PUT /api/monitor/:id` - Update monitor
+- `DELETE /api/monitor/:id` - Delete monitor
+- `PATCH /api/monitor/:id/toggle` - Toggle enabled
+- `GET /api/monitor/:id/stats` - Get statistics
+- `GET /api/monitor/:id/history` - Get check history
+
+### Health
+- `GET /health` - Health check
+
+## 🔒 Security Features
+
+1. **JWT Authentication** - Secure token-based auth with 7-day expiry
+2. **Password Hashing** - bcrypt with salt rounds
+3. **Rate Limiting** - 100 requests/minute per IP
+4. **Input Validation** - Server-side validation on all inputs
+5. **CORS Protection** - Configured CORS policies
+6. **Auto-lock** - Inactivity detection and screen locking
+7. **Secure Defaults** - No sensitive data in localStorage
+
+## 🚀 Production Deployment
+
+### Frontend Build
+
+```bash
+npm run build
+```
+
+Serves the `build/` directory with your preferred web server.
+
+### Backend Build
+
+```bash
+cd backend
+go build -o runnerx-server main.go
+```
+
+Run the binary:
+```bash
+./runnerx-server
+```
+
+### Docker (Optional)
+
+Create `Dockerfile` for containerized deployment:
+```dockerfile
+# Frontend
+FROM node:18 AS frontend
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Backend
+FROM golang:1.21 AS backend
+WORKDIR /app
+COPY backend/ .
+RUN go build -o runnerx-server main.go
+
+# Production
+FROM debian:bullseye-slim
+WORKDIR /app
+COPY --from=backend /app/runnerx-server .
+COPY --from=frontend /app/build ./public
+EXPOSE 8080
+CMD ["./runnerx-server"]
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- Inspired by [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+- Built with modern web technologies
+- Designed for self-hosting and privacy
+
+## 📧 Support
+
+For issues and questions, please open an issue on GitHub.
+
+---
+
+**Made with ❤️ for the self-hosting community**

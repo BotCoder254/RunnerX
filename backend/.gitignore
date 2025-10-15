@@ -1,0 +1,32 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+runnerx-server
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+

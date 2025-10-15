@@ -1,0 +1,213 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import Header from './Header';
+import Sidebar from './Sidebar';
+import MonitorCard from './MonitorCard';
+import MonitorModal from './MonitorModal';
+import MonitorDetailDrawer from './MonitorDetailDrawer';
+import StatsOverview from './StatsOverview';
+import NotificationCenter from '../notifications/NotificationCenter';
+import { useMonitors } from '../../hooks/useMonitors';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { useUserPreferences, useUpdateUserPreferences } from '../../hooks/useUserPreferences';
+import { Activity, AlertCircle } from 'lucide-react';
+
+const Dashboard = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [editingMonitor, setEditingMonitor] = useState(null);
+  const [selectedMonitor, setSelectedMonitor] = useState(null);
+  const [filters, setFilters] = useState({ status: 'all' });
+
+  const { data: monitors, isLoading, error } = useMonitors();
+  const { data: preferences } = useUserPreferences();
+  const updatePreferences = useUpdateUserPreferences();
+  
+  // Initialize WebSocket for real-time updates
+  useWebSocket();
+
+  const [displayMode, setDisplayMode] = useState('grid');
+
+  useEffect(() => {
+    if (preferences?.display_mode) {
+      setDisplayMode(preferences.display_mode);
+    }
+  }, [preferences]);
+
+  const handleDisplayModeChange = (mode) => {
+    setDisplayMode(mode);
+    updatePreferences.mutate({ display_mode: mode });
+    // Also save to localStorage for instant access
+    localStorage.setItem('display_mode', mode);
+  };
+
+  const handleAddMonitor = () => {
+    setEditingMonitor(null);
+    setModalOpen(true);
+  };
+
+  const handleEditMonitor = (monitor) => {
+    setEditingMonitor(monitor);
+    setModalOpen(true);
+  };
+
+  const handleViewDetails = (monitor) => {
+    setSelectedMonitor(monitor);
+    setDetailOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingMonitor(null);
+  };
+
+  const getGridClass = () => {
+    switch (displayMode) {
+      case 'grid':
+        return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6';
+      case 'list':
+        return 'grid grid-cols-1 gap-4';
+      case 'compact':
+        return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3';
+      case 'masonry':
+        return 'columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6';
+      default:
+        return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6';
+    }
+  };
+
+  const filteredMonitors = monitors?.filter((monitor) => {
+    if (filters.status === 'all') return true;
+    return monitor.status === filters.status;
+  }) || [];
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-danger-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">
+            Failed to load monitors
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400">
+            {error.message || 'Please check your connection and try again'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+      <Header 
+        onAddMonitor={handleAddMonitor} 
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onToggleNotifications={() => setNotificationOpen(!notificationOpen)}
+        displayMode={displayMode}
+        onDisplayModeChange={handleDisplayModeChange}
+      />
+
+      <div className="flex">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          filters={filters}
+          onFilterChange={setFilters}
+        />
+
+        <main className="flex-1 p-4 lg:p-6">
+          {/* Stats Overview */}
+          <StatsOverview monitors={monitors || []} />
+
+          {/* Monitors Grid */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-white">
+                {filters.status === 'all' ? 'All Monitors' : `${filters.status.charAt(0).toUpperCase() + filters.status.slice(1)} Monitors`}
+                <span className="ml-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  ({filteredMonitors.length})
+                </span>
+              </h2>
+            </div>
+
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {[...Array(8)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-96 bg-white dark:bg-neutral-800 rounded-xl animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : filteredMonitors.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center py-20"
+              >
+                <Activity className="w-16 h-16 text-neutral-300 dark:text-neutral-700 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
+                  No monitors yet
+                </h3>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
+                  Get started by adding your first monitor
+                </p>
+                <button
+                  onClick={handleAddMonitor}
+                  className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition font-medium shadow-lg shadow-primary-500/30"
+                >
+                  Add Your First Monitor
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div
+                layout
+                className={displayMode === 'masonry' ? getGridClass() : ''}
+              >
+                <div className={displayMode !== 'masonry' ? getGridClass() : ''}>
+                  {filteredMonitors.map((monitor) => (
+                    <MonitorCard
+                      key={monitor.id}
+                      monitor={monitor}
+                      onEdit={handleEditMonitor}
+                      onViewDetails={handleViewDetails}
+                      displayMode={displayMode}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Add/Edit Modal */}
+      <MonitorModal
+        isOpen={modalOpen}
+        onClose={handleCloseModal}
+        monitor={editingMonitor}
+      />
+
+      {/* Detail Drawer */}
+      <MonitorDetailDrawer
+        monitor={selectedMonitor}
+        isOpen={detailOpen}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelectedMonitor(null);
+        }}
+      />
+
+      {/* Notification Center */}
+      <NotificationCenter
+        isOpen={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+      />
+    </div>
+  );
+};
+
+export default Dashboard;
+
