@@ -1,5 +1,5 @@
-import React from 'react';
-import { Line } from 'react-chartjs-2';
+import React from "react";
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -7,19 +7,27 @@ import {
   PointElement,
   LineElement,
   Tooltip,
-} from 'chart.js';
+  Filler,
+} from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Filler,
+);
 
 const MiniChart = ({ data, status }) => {
   const getColor = () => {
     switch (status) {
-      case 'up':
-        return { line: 'rgb(34, 197, 94)', bg: 'rgba(34, 197, 94, 0.1)' };
-      case 'down':
-        return { line: 'rgb(239, 68, 68)', bg: 'rgba(239, 68, 68, 0.1)' };
+      case "up":
+        return { line: "rgb(34, 197, 94)", bg: "rgba(34, 197, 94, 0.1)" };
+      case "down":
+        return { line: "rgb(239, 68, 68)", bg: "rgba(239, 68, 68, 0.1)" };
       default:
-        return { line: 'rgb(115, 115, 115)', bg: 'rgba(115, 115, 115, 0.1)' };
+        return { line: "rgb(115, 115, 115)", bg: "rgba(115, 115, 115, 0.1)" };
     }
   };
 
@@ -54,7 +62,7 @@ const MiniChart = ({ data, status }) => {
     },
     interaction: {
       intersect: false,
-      mode: 'index',
+      mode: "index",
     },
   };
 
@@ -66,4 +74,3 @@ const MiniChart = ({ data, status }) => {
 };
 
 export default MiniChart;
-

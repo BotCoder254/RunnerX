@@ -120,21 +120,22 @@ func (c *Client) writePump(conn *websocket.Conn) {
 				return
 			}
 
-			w, err := conn.NextWriter(websocket.TextMessage)
-			if err != nil {
+			// Send the first message
+			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
-			w.Write(message)
 
-			// Add queued messages to current websocket message
+			// Send any additional queued messages as separate messages
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.Send)
-			}
-
-			if err := w.Close(); err != nil {
-				return
+				select {
+				case queuedMessage := <-c.Send:
+					if err := conn.WriteMessage(websocket.TextMessage, queuedMessage); err != nil {
+						return
+					}
+				default:
+					break
+				}
 			}
 
 		case <-ticker.C:
@@ -145,4 +146,3 @@ func (c *Client) writePump(conn *websocket.Conn) {
 		}
 	}
 }
-

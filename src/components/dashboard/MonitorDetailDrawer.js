@@ -1,41 +1,79 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, TrendingUp, Clock, AlertCircle, CheckCircle, 
-  XCircle, Calendar, Activity, Info 
-} from 'lucide-react';
-import { Line } from 'react-chartjs-2';
-import { useMonitorHistory, useMonitorStats } from '../../hooks/useMonitors';
-import { formatLatency, formatDateTime, getStatusLabel } from '../../utils/formatters';
-import { STATUS_COLORS } from '../../utils/constants';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  Activity,
+  Info,
+} from "lucide-react";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
+import { useMonitorHistory, useMonitorStats } from "../../hooks/useMonitors";
+import {
+  formatLatency,
+  formatDateTime,
+  getStatusLabel,
+} from "../../utils/formatters";
+import { STATUS_COLORS } from "../../utils/constants";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+);
 
 const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
-  const [timeRange, setTimeRange] = useState('24h');
+  const [timeRange, setTimeRange] = useState("24h");
   const { data: history, isLoading: historyLoading } = useMonitorHistory(
-    monitor?.id, 
-    timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30
+    monitor?.id,
+    timeRange === "24h" ? 1 : timeRange === "7d" ? 7 : 30,
   );
   const { data: stats } = useMonitorStats(monitor?.id);
 
   if (!monitor) return null;
 
   const timeRanges = [
-    { label: '24 Hours', value: '24h' },
-    { label: '7 Days', value: '7d' },
-    { label: '30 Days', value: '30d' },
+    { label: "24 Hours", value: "24h" },
+    { label: "7 Days", value: "7d" },
+    { label: "30 Days", value: "30d" },
   ];
 
   // Prepare chart data
   const chartData = {
-    labels: history?.map(check => new Date(check.created_at).toLocaleTimeString()) || [],
+    labels:
+      history?.map((check) =>
+        new Date(check.created_at).toLocaleTimeString(),
+      ) || [],
     datasets: [
       {
-        label: 'Latency (ms)',
-        data: history?.map(check => check.latency_ms) || [],
-        borderColor: monitor.status === 'up' ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)',
-        backgroundColor: monitor.status === 'up' 
-          ? 'rgba(34, 197, 94, 0.1)' 
-          : 'rgba(239, 68, 68, 0.1)',
+        label: "Latency (ms)",
+        data: history?.map((check) => check.latency_ms) || [],
+        borderColor:
+          monitor.status === "up" ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
+        backgroundColor:
+          monitor.status === "up"
+            ? "rgba(34, 197, 94, 0.1)"
+            : "rgba(239, 68, 68, 0.1)",
         borderWidth: 2,
         fill: true,
         tension: 0.4,
@@ -60,7 +98,7 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.05)',
+          color: "rgba(0, 0, 0, 0.05)",
         },
         ticks: {
           callback: (value) => `${value}ms`,
@@ -95,10 +133,10 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
 
           {/* Drawer */}
           <motion.div
-            initial={{ x: '100%' }}
+            initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="fixed right-0 top-0 h-full w-full md:w-2/3 lg:w-1/2 bg-white dark:bg-neutral-900 shadow-2xl z-50 overflow-y-auto"
           >
             {/* Header */}
@@ -122,15 +160,19 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
 
               {/* Status Badge */}
               <div className="mt-4">
-                <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${statusColor.bg} ${statusColor.text}`}>
-                  {monitor.status === 'up' ? (
+                <span
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${statusColor.bg} ${statusColor.text}`}
+                >
+                  {monitor.status === "up" ? (
                     <CheckCircle className="w-5 h-5" />
-                  ) : monitor.status === 'down' ? (
+                  ) : monitor.status === "down" ? (
                     <XCircle className="w-5 h-5" />
                   ) : (
                     <AlertCircle className="w-5 h-5" />
                   )}
-                  <span className="font-semibold">{getStatusLabel(monitor.status)}</span>
+                  <span className="font-semibold">
+                    {getStatusLabel(monitor.status)}
+                  </span>
                 </span>
               </div>
             </div>
@@ -215,8 +257,8 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                         onClick={() => setTimeRange(range.value)}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                           timeRange === range.value
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                            ? "bg-primary-600 text-white"
+                            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
                         }`}
                       >
                         {range.label}
@@ -252,7 +294,8 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {history && history.length > 0 ? (
                     history.slice(0, 20).map((check, index) => {
-                      const checkColor = STATUS_COLORS[check.status] || STATUS_COLORS.pending;
+                      const checkColor =
+                        STATUS_COLORS[check.status] || STATUS_COLORS.pending;
                       return (
                         <motion.div
                           key={check.id || index}
@@ -261,10 +304,14 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                           transition={{ delay: index * 0.02 }}
                           className="flex items-center gap-4 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg"
                         >
-                          <div className={`w-2 h-2 rounded-full ${checkColor.bg}`} />
+                          <div
+                            className={`w-2 h-2 rounded-full ${checkColor.bg}`}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className={`text-sm font-medium ${checkColor.text}`}>
+                              <span
+                                className={`text-sm font-medium ${checkColor.text}`}
+                              >
                                 {getStatusLabel(check.status)}
                               </span>
                               {check.status_code && (
@@ -302,4 +349,3 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
 };
 
 export default MonitorDetailDrawer;
-

@@ -19,7 +19,7 @@ var (
 )
 
 const (
-	rateLimit  = 100        // requests
+	rateLimit  = 1000        // requests
 	timeWindow = time.Minute // per minute
 )
 
@@ -79,4 +79,3 @@ func RateLimiter() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
