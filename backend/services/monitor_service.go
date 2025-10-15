@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"io"
+	"bytes"
 
 	"gorm.io/gorm"
 )
@@ -17,13 +19,15 @@ import (
 type MonitorService struct {
 	db  *gorm.DB
 	hub *ws.Hub
+    ae  *AutomationEngine
 }
 
 func NewMonitorService(db *gorm.DB, hub *ws.Hub) *MonitorService {
-	return &MonitorService{
-		db:  db,
-		hub: hub,
-	}
+    return &MonitorService{
+        db:  db,
+        hub: hub,
+        ae:  NewAutomationEngine(db, hub),
+    }
 }
 
 // Start begins monitoring all enabled monitors
@@ -116,7 +120,7 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 
 	// Handle status change
 	if oldStatus != status && oldStatus != "pending" {
-		// Broadcast status change
+        // Broadcast status change
 		statusChangeData := map[string]interface{}{
 			"monitor_id": monitor.ID,
 			"old_status": oldStatus,
@@ -124,6 +128,11 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 			"timestamp":  time.Now(),
 		}
 		ms.hub.BroadcastToUser(monitor.UserID, "monitor:status_change", statusChangeData)
+
+        // Evaluate automation rules
+        if ms.ae != nil {
+            ms.ae.EvaluateRules(monitor.UserID, monitor.ID, status, oldStatus)
+        }
 
 		// Create notification with burst suppression
 		shouldCreateNotification := ms.shouldCreateNotification(monitor.ID, status)
@@ -197,7 +206,7 @@ func (ms *MonitorService) checkHTTP(monitor *models.Monitor) (string, int64, int
 		method = "GET"
 	}
 
-	req, err := http.NewRequest(method, monitor.Endpoint, nil)
+    req, err := http.NewRequest(method, monitor.Endpoint, nil)
 	if err != nil {
 		return "down", 0, 0, err.Error()
 	}
@@ -215,11 +224,20 @@ func (ms *MonitorService) checkHTTP(monitor *models.Monitor) (string, int64, int
     }
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-		return "up", latencyMs, resp.StatusCode, ""
-	}
+    if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+        // Capture a small safe snapshot body (truncate to 1KB) for HTTP monitors
+        var buf bytes.Buffer
+        limited := io.LimitReader(resp.Body, 1024)
+        _, _ = io.Copy(&buf, limited)
+        body := sanitizeSnapshot(buf.String())
+        // Rewind not needed as we already closed later; store body in error field for simplicity
+        if body != "" {
+            // no-op here; snapshot saved via Check fields below if needed
+        }
+        return "up", latencyMs, resp.StatusCode, body
+    }
 
-	return "down", latencyMs, resp.StatusCode, fmt.Sprintf("Status code: %d", resp.StatusCode)
+    return "down", latencyMs, resp.StatusCode, fmt.Sprintf("Status code: %d", resp.StatusCode)
 }
 
 func (ms *MonitorService) checkPing(monitor *models.Monitor) (string, int64, string) {
@@ -260,6 +278,21 @@ func (ms *MonitorService) checkTCP(monitor *models.Monitor) (string, int64, stri
 	defer resp.Body.Close()
 
 	return "up", latencyMs, ""
+}
+
+// sanitizeSnapshot removes scripts and inline events from HTML/text
+func sanitizeSnapshot(s string) string {
+    // naive strip for scripts and on* attributes; for production use a real sanitizer
+    lower := strings.ToLower(s)
+    if strings.Contains(lower, "<script") {
+        s = strings.ReplaceAll(s, "<script", "")
+        s = strings.ReplaceAll(s, "</script>", "")
+    }
+    // strip common inline events
+    for _, attr := range []string{"onclick", "onload", "onerror", "onmouseover"} {
+        s = strings.ReplaceAll(s, attr+"=", "")
+    }
+    return s
 }
 
 // deriveRootCause infers a coarse cause classification for failed checks

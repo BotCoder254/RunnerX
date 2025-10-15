@@ -50,7 +50,25 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
     timeRange === "24h" ? 1 : timeRange === "7d" ? 7 : 30,
   );
   const { data: stats } = useMonitorStats(monitor?.id);
-  const [rootCause, setRootCause] = useState({ items: [], summary: { trend: "inconclusive" } });
+  const [activeTab, setActiveTab] = useState("performance");
+  const [snapshot, setSnapshot] = useState(null);
+  useEffect(() => {
+    if (!monitor || activeTab !== "snapshot") return;
+    let mounted = true;
+    monitorService
+      .getSnapshot(monitor.id)
+      .then((data) => {
+        if (mounted) setSnapshot(data);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [monitor, activeTab]);
+  const [rootCause, setRootCause] = useState({
+    items: [],
+    summary: { trend: "inconclusive" },
+  });
 
   useEffect(() => {
     if (!monitor || !isOpen) return;
@@ -58,7 +76,10 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
     monitorService
       .getRootCauseTimeline(monitor.id, "24h")
       .then((data) => {
-        if (isMounted) setRootCause(data || { items: [], summary: { trend: "inconclusive" } });
+        if (isMounted)
+          setRootCause(
+            data || { items: [], summary: { trend: "inconclusive" } },
+          );
       })
       .catch(() => {});
     return () => {
@@ -193,169 +214,213 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
               </div>
             </div>
 
+            {/* Tabs */}
+            <div className="px-6 pt-4">
+              <div className="flex gap-2">
+                {["performance", "snapshot"].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setActiveTab(t)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${activeTab === t ? "bg-primary-600 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"}`}
+                  >
+                    {t === "performance" ? "Performance" : "Snapshot"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Content */}
             <div className="p-6 space-y-6">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-neutral-500" />
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                      Uptime
-                    </span>
-                  </div>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-white">
-                    {monitor.uptime_percent?.toFixed(2) || 0}%
-                  </div>
-                  <div className="mt-1 flex items-center gap-1 text-xs text-neutral-500">
-                    <Info className="w-3 h-3" />
-                    <span>Based on {stats?.total_checks || 0} checks</span>
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-4 h-4 text-neutral-500" />
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                      Latency
-                    </span>
-                  </div>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-white">
-                    {formatLatency(monitor.last_latency_ms)}
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Last check
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-4 h-4 text-success-500" />
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                      Success
-                    </span>
-                  </div>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-white">
-                    {stats?.successful_checks || 0}
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Total checks
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-neutral-500" />
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                      Interval
-                    </span>
-                  </div>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-white">
-                    {monitor.interval_seconds}s
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Check frequency
-                  </div>
-                </div>
-              </div>
-
-              {/* Time Range Selector */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    Performance History
-                  </h3>
-                  <div className="flex gap-2">
-                    {timeRanges.map((range) => (
-                      <button
-                        key={range.value}
-                        onClick={() => setTimeRange(range.value)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                          timeRange === range.value
-                            ? "bg-primary-600 text-white"
-                            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-                        }`}
-                      >
-                        {range.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Chart */}
-                <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4 h-64 md:h-80">
-                  {historyLoading ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
-                    </div>
-                  ) : history && history.length > 0 ? (
-                    <Line data={chartData} options={chartOptions} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-neutral-500">
-                      <div className="text-center">
-                        <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No history data available</p>
+              {activeTab === "performance" && (
+                <>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-neutral-500" />
+                        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                          Uptime
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-neutral-900 dark:text-white">
+                        {monitor.uptime_percent?.toFixed(2) || 0}%
+                      </div>
+                      <div className="mt-1 flex items-center gap-1 text-xs text-neutral-500">
+                        <Info className="w-3 h-3" />
+                        <span>Based on {stats?.total_checks || 0} checks</span>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Recent Checks */}
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                  Recent Checks
-                </h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {history && history.length > 0 ? (
-                    history.slice(0, 20).map((check, index) => {
-                      const checkColor =
-                        STATUS_COLORS[check.status] || STATUS_COLORS.pending;
-                      return (
-                        <motion.div
-                          key={check.id || index}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.02 }}
-                          className="flex items-center gap-4 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg"
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-full ${checkColor.bg}`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-sm font-medium ${checkColor.text}`}
-                              >
-                                {getStatusLabel(check.status)}
-                              </span>
-                              {check.status_code && (
-                                <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                  HTTP {check.status_code}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                              {formatDateTime(check.created_at)}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-neutral-900 dark:text-white">
-                              {formatLatency(check.latency_ms)}
-                            </p>
-                          </div>
-                        </motion.div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-8 text-neutral-500">
-                      <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No checks recorded yet</p>
+                    <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Activity className="w-4 h-4 text-neutral-500" />
+                        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                          Latency
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-neutral-900 dark:text-white">
+                        {formatLatency(monitor.last_latency_ms)}
+                      </div>
+                      <div className="mt-1 text-xs text-neutral-500">
+                        Last check
+                      </div>
                     </div>
-                  )}
+
+                    <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-success-500" />
+                        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                          Success
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-neutral-900 dark:text-white">
+                        {stats?.successful_checks || 0}
+                      </div>
+                      <div className="mt-1 text-xs text-neutral-500">
+                        Total checks
+                      </div>
+                    </div>
+
+                    <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-4 h-4 text-neutral-500" />
+                        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                          Interval
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-neutral-900 dark:text-white">
+                        {monitor.interval_seconds}s
+                      </div>
+                      <div className="mt-1 text-xs text-neutral-500">
+                        Check frequency
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Time Range Selector */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+                        <Calendar className="w-5 h-5" />
+                        Performance History
+                      </h3>
+                      <div className="flex gap-2">
+                        {timeRanges.map((range) => (
+                          <button
+                            key={range.value}
+                            onClick={() => setTimeRange(range.value)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                              timeRange === range.value
+                                ? "bg-primary-600 text-white"
+                                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                            }`}
+                          >
+                            {range.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Chart */}
+                    <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4 h-64 md:h-80">
+                      {historyLoading ? (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent"></div>
+                        </div>
+                      ) : history && history.length > 0 ? (
+                        <Line data={chartData} options={chartOptions} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-neutral-500">
+                          <div className="text-center">
+                            <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p>No history data available</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Recent Checks */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                      Recent Checks
+                    </h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {history && history.length > 0 ? (
+                        history.slice(0, 20).map((check, index) => {
+                          const checkColor =
+                            STATUS_COLORS[check.status] ||
+                            STATUS_COLORS.pending;
+                          return (
+                            <motion.div
+                              key={check.id || index}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.02 }}
+                              className="flex items-center gap-4 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg"
+                            >
+                              <div
+                                className={`w-2 h-2 rounded-full ${checkColor.bg}`}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-sm font-medium ${checkColor.text}`}
+                                  >
+                                    {getStatusLabel(check.status)}
+                                  </span>
+                                  {check.status_code && (
+                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                      HTTP {check.status_code}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                                  {formatDateTime(check.created_at)}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-neutral-900 dark:text-white">
+                                  {formatLatency(check.latency_ms)}
+                                </p>
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-neutral-500">
+                          <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No checks recorded yet</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === "snapshot" && (
+                <div>
+                  <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
+                    <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-3">
+                      {snapshot?.status_code
+                        ? `HTTP ${snapshot.status_code}`
+                        : ""}{" "}
+                      · {snapshot?.latency_ms ? `${snapshot.latency_ms}ms` : ""}
+                    </div>
+                    <div className="h-[60vh] overflow-auto rounded bg-white dark:bg-neutral-900">
+                      <iframe
+                        title="snapshot"
+                        sandbox="allow-same-origin"
+                        className="w-full h-full"
+                        srcDoc={
+                          snapshot?.body_preview ||
+                          '<pre class="p-4 text-neutral-500">No snapshot</pre>'
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Root Cause Timeline */}
               <div>
@@ -365,14 +430,24 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                 <div className="space-y-2 max-h-72 overflow-y-auto">
                   {rootCause.items && rootCause.items.length > 0 ? (
                     rootCause.items.map((it, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                      <div
+                        key={idx}
+                        className="flex items-start gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg"
+                      >
                         <div className="w-2 h-2 mt-2 rounded-full bg-danger-500" />
                         <div className="flex-1">
                           <p className="text-sm text-neutral-900 dark:text-white">
-                            {new Date(it.timestamp).toLocaleTimeString()} — {String(it.cause_type || 'unknown').replace('_',' ')} {it.status_code ? `(HTTP ${it.status_code})` : ''}
+                            {new Date(it.timestamp).toLocaleTimeString()} —{" "}
+                            {String(it.cause_type || "unknown").replace(
+                              "_",
+                              " ",
+                            )}{" "}
+                            {it.status_code ? `(HTTP ${it.status_code})` : ""}
                           </p>
                           {it.detail && (
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">{it.detail}</p>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                              {it.detail}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -384,7 +459,9 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                     </div>
                   )}
                 </div>
-                <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">Trend: {rootCause?.summary?.trend || 'inconclusive'}</div>
+                <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  Trend: {rootCause?.summary?.trend || "inconclusive"}
+                </div>
               </div>
             </div>
           </motion.div>

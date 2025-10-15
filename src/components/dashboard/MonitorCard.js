@@ -28,6 +28,8 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
   const deleteMonitor = useDeleteMonitor();
   const { data: history } = useMonitorHistory(monitor.id, 1);
   const [forecast, setForecast] = useState([]);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState(null);
   const [showForecast, setShowForecast] = useState(() => {
     const pref = localStorage.getItem('show_forecast');
     return pref ? pref === 'true' : true;
@@ -40,6 +42,15 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
     }).catch(() => {});
     return () => { isMounted = false; };
   }, [monitor.id]);
+
+  const openSnapshot = async (e) => {
+    e.stopPropagation();
+    try {
+      const data = await monitorService.getSnapshot(monitor.id);
+      setSnapshot(data);
+      setSnapshotOpen(true);
+    } catch {}
+  };
 
   // Listen for status change events
   useEffect(() => {
@@ -96,6 +107,11 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
   const isCompact = displayMode === 'compact';
   const isList = displayMode === 'list';
 
+  const handleCardClick = () => {
+    if (snapshotOpen || showMenu) return; // prevent drawer when modal/menu open
+    onViewDetails && onViewDetails(monitor);
+  };
+
   return (
     <motion.div
       layout
@@ -108,7 +124,7 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
       whileHover={{ y: -4 }}
       onHoverStart={() => setShowWater(true)}
       onHoverEnd={() => setShowWater(false)}
-      onClick={() => onViewDetails && onViewDetails(monitor)}
+      onClick={handleCardClick}
       transition={{ duration: 0.3 }}
       className={`relative bg-white dark:bg-neutral-800 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden transition-all hover:shadow-xl cursor-pointer ${
         displayMode === 'masonry' ? 'break-inside-avoid mb-6' : ''
@@ -160,8 +176,8 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
                   animate={{ opacity: 1, y: 0 }}
                   className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-700 rounded-lg shadow-xl border border-neutral-200 dark:border-neutral-600 overflow-hidden z-50"
                 >
-                  <button
-                    onClick={handleToggle}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleToggle(); }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-600 transition text-sm"
                   >
                     {monitor.enabled ? (
@@ -176,15 +192,15 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
                       </>
                     )}
                   </button>
-                  <button
-                    onClick={handleEdit}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleEdit(); }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-600 transition text-sm"
                   >
                     <Edit2 className="w-4 h-4" />
                     Edit
                   </button>
-                  <button
-                    onClick={handleDelete}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(); }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition text-sm"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -255,8 +271,11 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
 
         {/* Mini Sparkline */}
         {!isCompact && sparklineData.length > 0 && (
-          <div className="h-16 mb-3">
-            <MiniChart data={sparklineData} status={monitor.status} />
+          <div className="h-16 mb-3 flex items-center gap-3">
+            <div className="flex-1 h-full">
+              <MiniChart data={sparklineData} status={monitor.status} />
+            </div>
+            {/* Snapshot button removed; accessible in Drawer tab */}
           </div>
         )}
 
@@ -299,6 +318,35 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
           </div>
         )}
       </div>
+      {/* Snapshot Modal */}
+      <AnimatePresence>
+        {snapshotOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={(e) => { e.stopPropagation(); setSnapshotOpen(false); setSnapshot(null); }} />
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="relative z-10 w-[96vw] md:w-[90vw] max-w-4xl max-h-[85vh] bg-white dark:bg-neutral-900 rounded-xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
+                <div className="text-sm text-neutral-600 dark:text-neutral-300">
+                  {snapshot?.status_code ? `HTTP ${snapshot.status_code}` : ''} · {snapshot?.latency_ms ? `${snapshot.latency_ms}ms` : ''}
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setSnapshotOpen(false); setSnapshot(null); }} className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800" aria-label="Close snapshot">
+                  ×
+                </button>
+              </div>
+              <div className="grid md:grid-cols-3 gap-0">
+                <div className="p-3 border-r border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-300 hidden md:block">
+                  <div className="font-semibold mb-2">Headers</div>
+                  <pre className="whitespace-pre-wrap break-words">{JSON.stringify(snapshot?.headers || {}, null, 2)}</pre>
+                </div>
+                <div className="md:col-span-2 p-3">
+                  <div className="h-[70vh] md:h-[60vh] overflow-auto bg-neutral-50 dark:bg-neutral-800 rounded">
+                    <iframe title="snapshot" sandbox="allow-same-origin" className="w-full h-full" srcDoc={snapshot?.body_preview || '<pre>No snapshot</pre>'} />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

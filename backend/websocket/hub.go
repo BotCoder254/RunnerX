@@ -23,6 +23,7 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	mu         sync.RWMutex
+    // optional: future per-topic channels
 }
 
 func NewHub() *Hub {

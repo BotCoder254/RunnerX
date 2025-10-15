@@ -102,12 +102,9 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
             )}
           </button>
 
-          <button
-            className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition hidden md:block"
-            title="Settings"
-          >
+          <a href="/dashboard?section=automation" className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition hidden md:block" title="Automation">
             <Settings className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
-          </button>
+          </a>
           {/* Quick Settings Dropdown */}
           <div className="relative hidden md:block">
             <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-800 rounded-lg shadow-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden z-50"></div>

@@ -169,6 +169,24 @@ export const useWebSocket = () => {
       },
     );
 
+    // Subscribe to automation actions
+    const unsubscribeAutomation = wsService.subscribe(
+      "automation:action",
+      (data) => {
+        const { action, status, monitor_id } = data || {};
+        if (action === 'toast') {
+          if (status === 'down') toast.error(`Automation: Monitor ${monitor_id} is down`);
+          if (status === 'up') toast.success(`Automation: Monitor ${monitor_id} recovered`);
+        }
+        if (action === 'sound') {
+          try {
+            const audio = new Audio('/notification.wav');
+            audio.volume = 0.5; audio.play();
+          } catch {}
+        }
+      }
+    );
+
     // Subscribe to heartbeat/ping responses
     const unsubscribePing = wsService.subscribe("pong", () => {
       // Keep connection alive, no action needed
@@ -203,6 +221,7 @@ export const useWebSocket = () => {
       unsubscribeStatusChange();
       unsubscribeMood();
       unsubscribeNotification();
+      unsubscribeAutomation();
       unsubscribePing();
       unsubscribeError();
 

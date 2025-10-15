@@ -30,6 +30,7 @@ func MonitorRoutes(router *gin.RouterGroup, db *gorm.DB) {
 	router.PATCH("/monitor/:id/toggle", monitorController.ToggleMonitor)
 	router.GET("/monitor/:id/stats", monitorController.GetMonitorStats)
 	router.GET("/monitor/:id/history", monitorController.GetMonitorHistory)
+    router.GET("/monitor/:id/snapshot", monitorController.GetMonitorSnapshot)
 }
 
 func NotificationRoutes(router *gin.RouterGroup, db *gorm.DB) {
@@ -48,5 +49,23 @@ func UserRoutes(router *gin.RouterGroup, db *gorm.DB) {
 	router.GET("/user/me", userController.GetCurrentUser)
 	router.GET("/user/preferences", userController.GetUserPreferences)
 	router.PUT("/user/preferences", userController.UpdateUserPreferences)
+}
+
+func AutomationRoutes(router *gin.RouterGroup, db *gorm.DB) {
+    automationController := controllers.NewAutomationController(db)
+    router.GET("/automation/rules", automationController.List)
+    router.POST("/automation/rules", automationController.Create)
+    router.DELETE("/automation/rules/:id", automationController.Delete)
+}
+
+func StatusPageRoutes(router *gin.RouterGroup, db *gorm.DB) {
+    spController := controllers.NewStatusPageController(db)
+    // Authenticated create/list under /api
+    router.POST("/status_page", spController.Create)
+}
+
+func PublicRoutes(router *gin.RouterGroup, db *gorm.DB) {
+    spController := controllers.NewStatusPageController(db)
+    router.GET("/status/:slug", spController.GetBySlug)
 }
 

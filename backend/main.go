@@ -71,7 +71,13 @@ func main() {
 		routes.MonitorRoutes(protected, db)
 		routes.NotificationRoutes(protected, db)
 		routes.UserRoutes(protected, db)
+		routes.StatusPageRoutes(protected, db)
+		routes.AutomationRoutes(protected, db)
 	}
+
+	// Public routes (no auth)
+	public := r.Group("")
+	routes.PublicRoutes(public, db)
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {

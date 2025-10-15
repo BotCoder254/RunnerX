@@ -10,6 +10,9 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './components/dashboard/Dashboard';
+import StatusPublicPage from './components/status/StatusPublicPage';
+import AutomationPage from './components/automation/AutomationPage';
+import LogsPage from './components/logs/LogsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +33,23 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/status/:slug" element={<StatusPublicPage />} />
+              <Route
+                path="/automation"
+                element={
+                  <ProtectedRoute>
+                    <AutomationPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/logs"
+                element={
+                  <ProtectedRoute>
+                    <LogsPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/dashboard"
                 element={

@@ -51,6 +51,11 @@ export const monitorService = {
     return response.data;
   },
 
+  async getSnapshot(id) {
+    const response = await api.get(`/monitor/${id}/snapshot`);
+    return response.data;
+  },
+
   async testMonitor(monitorData) {
     const response = await api.post('/monitor/test', monitorData);
     return response.data;

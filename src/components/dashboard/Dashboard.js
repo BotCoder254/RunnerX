@@ -285,6 +285,15 @@ const Dashboard = () => {
         isOpen={notificationOpen}
         onClose={() => setNotificationOpen(false)}
       />
+
+      {/* Floating action to create Status Page */}
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModalOpen(true); }}
+        className="fixed bottom-6 right-6 px-4 py-3 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg"
+        title="Create Status Page"
+      >
+        Publish Status Page
+      </button>
     </div>
   );
 };

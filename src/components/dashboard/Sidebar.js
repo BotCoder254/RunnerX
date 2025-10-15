@@ -9,6 +9,7 @@ import {
   Filter,
   Tag,
   X,
+  Radio,
 } from "lucide-react";
 
 const Sidebar = ({
@@ -142,7 +143,7 @@ const Sidebar = ({
             animate={{ x: 0 }}
             exit={{ x: -300 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed lg:sticky top-0 left-0 h-screen w-72 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 z-50 overflow-y-auto"
+            className="fixed lg:sticky top-0 left-0 h-screen w-72 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 z-50"
           >
             <div className="p-6">
               {/* Header */}
@@ -159,6 +160,14 @@ const Sidebar = ({
                 >
                   <X className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
                 </button>
+              </div>
+
+              {/* Navigation */}
+              <div className="space-y-2 mb-6">
+                <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-3">Navigate</h3>
+                <a href="/dashboard" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Dashboard</a>
+                <a href="/logs" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Logs</a>
+                <a href="/dashboard?section=automation" className="block px-4 py-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">Automation</a>
               </div>
 
               {/* Status Filters */}
