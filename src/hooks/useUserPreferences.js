@@ -16,6 +16,7 @@ export const useUserPreferences = () => {
           default_interval: 60,
           timezone: 'UTC',
           animation_pref: true,
+          show_forecast: true,
         };
       }
     },

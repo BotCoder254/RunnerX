@@ -78,6 +78,7 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 	}
 
 	// Save check result
+	causeType, causeDetail := deriveRootCause(monitor.Type, status, statusCode, errorMsg)
 	check := models.Check{
 		MonitorID:    monitor.ID,
 		Status:       status,
@@ -85,6 +86,8 @@ func (ms *MonitorService) checkMonitor(monitor *models.Monitor) {
 		StatusCode:   statusCode,
 		ErrorMsg:     errorMsg,
 		ResponseTime: time.Since(startTime),
+		CauseType:    causeType,
+		CauseDetail:  causeDetail,
 	}
 
 	if err := ms.db.Create(&check).Error; err != nil {
@@ -204,12 +207,12 @@ func (ms *MonitorService) checkHTTP(monitor *models.Monitor) (string, int64, int
 	req.Header.Set("User-Agent", "RunnerX-Monitor/1.0")
 
 	startTime := time.Now()
-	resp, err := client.Do(req)
+    resp, err := client.Do(req)
 	latencyMs := time.Since(startTime).Milliseconds()
 
-	if err != nil {
-		return "down", latencyMs, 0, err.Error()
-	}
+    if err != nil {
+        return "down", latencyMs, 0, err.Error()
+    }
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
@@ -232,9 +235,9 @@ func (ms *MonitorService) checkPing(monitor *models.Monitor) (string, int64, str
 	err := cmd.Run()
 	latencyMs := time.Since(startTime).Milliseconds()
 
-	if err != nil {
-		return "down", latencyMs, err.Error()
-	}
+    if err != nil {
+        return "down", latencyMs, err.Error()
+    }
 
 	return "up", latencyMs, ""
 }
@@ -257,5 +260,35 @@ func (ms *MonitorService) checkTCP(monitor *models.Monitor) (string, int64, stri
 	defer resp.Body.Close()
 
 	return "up", latencyMs, ""
+}
+
+// deriveRootCause infers a coarse cause classification for failed checks
+func deriveRootCause(monitorType, status string, statusCode int, errMsg string) (string, string) {
+    if status == "up" {
+        return "", ""
+    }
+    // HTTP codes
+    if monitorType == "http" && statusCode > 0 {
+        return "http_error", fmt.Sprintf("HTTP %d", statusCode)
+    }
+    // Error message heuristics
+    lower := strings.ToLower(errMsg)
+    switch {
+    case strings.Contains(lower, "timeout"):
+        if monitorType == "dns" || strings.Contains(lower, "lookup") {
+            return "dns_error", "DNS timeout"
+        }
+        return "connection_timeout", "Connection timed out"
+    case strings.Contains(lower, "tls") || strings.Contains(lower, "ssl"):
+        return "ssl_error", errMsg
+    case strings.Contains(lower, "no such host") || strings.Contains(lower, "lookup"):
+        return "dns_error", errMsg
+    case strings.Contains(lower, "refused"):
+        return "tcp_error", "Connection refused"
+    }
+    if errMsg != "" {
+        return "unknown", errMsg
+    }
+    return "unknown", ""
 }
 

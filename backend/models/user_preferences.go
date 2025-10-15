@@ -16,6 +16,7 @@ type UserPreferences struct {
 	DefaultInterval int            `gorm:"default:60" json:"default_interval"`
 	Timezone        string         `gorm:"default:UTC" json:"timezone"`
 	AnimationPref   bool           `gorm:"default:true" json:"animation_pref"`
+    ShowForecast    bool           `gorm:"default:true" json:"show_forecast"`
 	
 	// Relations
 	User User `gorm:"foreignKey:UserID" json:"-"`

@@ -33,11 +33,23 @@ const Dashboard = () => {
 
   const [displayMode, setDisplayMode] = useState("grid");
 
+  // Lightweight global background that reacts to system mood websocket
+  const [systemMood, setSystemMood] = useState(0);
+
   useEffect(() => {
     if (preferences?.display_mode) {
       setDisplayMode(preferences.display_mode);
     }
   }, [preferences]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const { mood } = e.detail || {};
+      if (typeof mood === "number") setSystemMood(mood);
+    };
+    window.addEventListener("system_mood_update", handler);
+    return () => window.removeEventListener("system_mood_update", handler);
+  }, []);
 
   const handleDisplayModeChange = (mode) => {
     setDisplayMode(mode);
@@ -121,8 +133,26 @@ const Dashboard = () => {
     );
   }
 
+  const moodOpacity =
+    ["opacity-20", "opacity-30", "opacity-50", "opacity-70"][systemMood] ||
+    "opacity-20";
+
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 relative">
+      <div
+        aria-hidden
+        className={`pointer-events-none fixed inset-0 z-0 transition-all duration-700 ${moodOpacity}`}
+        style={{
+          background:
+            systemMood === 3
+              ? "radial-gradient(1200px 600px at 50% -200px, rgba(220,38,38,0.25), transparent), radial-gradient(800px 400px at 10% 120%, rgba(220,38,38,0.2), transparent)"
+              : systemMood === 2
+                ? "radial-gradient(1000px 500px at 50% -200px, rgba(245,158,11,0.20), transparent), radial-gradient(700px 350px at 90% 120%, rgba(245,158,11,0.18), transparent)"
+                : systemMood === 1
+                  ? "radial-gradient(900px 450px at 50% -200px, rgba(59,130,246,0.18), transparent)"
+                  : "radial-gradient(900px 450px at 50% -200px, rgba(16,185,129,0.15), transparent)",
+        }}
+      />
       <Header
         onAddMonitor={handleAddMonitor}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -140,7 +170,7 @@ const Dashboard = () => {
           monitors={monitors}
         />
 
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 p-4 lg:p-6 relative z-10">
           {/* Stats Overview */}
           <StatsOverview monitors={monitors || []} />
 

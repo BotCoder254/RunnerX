@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import WaterEffect from './WaterEffect';
 import MiniChart from './MiniChart';
+import { monitorService } from '../../services/monitorService';
 import StatusBar from './StatusBar';
 import { STATUS_COLORS } from '../../utils/constants';
 import { formatLatency, formatUptime, formatDate } from '../../utils/formatters';
@@ -26,6 +27,19 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
   const toggleMonitor = useToggleMonitor();
   const deleteMonitor = useDeleteMonitor();
   const { data: history } = useMonitorHistory(monitor.id, 1);
+  const [forecast, setForecast] = useState([]);
+  const [showForecast, setShowForecast] = useState(() => {
+    const pref = localStorage.getItem('show_forecast');
+    return pref ? pref === 'true' : true;
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    monitorService.getMonitorForecast(monitor.id, 24).then((data) => {
+      if (isMounted) setForecast(data || []);
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [monitor.id]);
 
   // Listen for status change events
   useEffect(() => {
@@ -243,6 +257,31 @@ const MonitorCard = ({ monitor, onEdit, onViewDetails, displayMode = 'grid' }) =
         {!isCompact && sparklineData.length > 0 && (
           <div className="h-16 mb-3">
             <MiniChart data={sparklineData} status={monitor.status} />
+          </div>
+        )}
+
+        {/* Health Forecast Bar */}
+        {!isCompact && showForecast && forecast.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Next 24h forecast</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); const v = !showForecast; setShowForecast(v); localStorage.setItem('show_forecast', String(v)); }}
+                className="text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+              >
+                {showForecast ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <div className="grid grid-cols-24 gap-0.5">
+              {forecast.slice(0,24).reverse().map((f, idx) => {
+                const risk = Math.max(0, Math.min(100, f.risk_score || 0));
+                const color = risk < 25 ? 'bg-neutral-300 dark:bg-neutral-600' : risk < 50 ? 'bg-warning-400' : risk < 75 ? 'bg-orange-500' : 'bg-danger-600';
+                const pulse = risk >= 50 ? { opacity: [0.7, 1, 0.7] } : {};
+                return (
+                  <motion.div key={idx} className={`h-3 rounded-sm ${color}`} animate={pulse} transition={{ duration: 2, repeat: Infinity }} title={`Risk ${Math.round(risk)}% — Based on the last 7 days of response times and downtime patterns.`} />
+                );
+              })}
+            </div>
           </div>
         )}
 

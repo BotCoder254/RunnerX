@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -24,6 +24,7 @@ import {
   Filler,
 } from "chart.js";
 import { useMonitorHistory, useMonitorStats } from "../../hooks/useMonitors";
+import { monitorService } from "../../services/monitorService";
 import {
   formatLatency,
   formatDateTime,
@@ -49,6 +50,21 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
     timeRange === "24h" ? 1 : timeRange === "7d" ? 7 : 30,
   );
   const { data: stats } = useMonitorStats(monitor?.id);
+  const [rootCause, setRootCause] = useState({ items: [], summary: { trend: "inconclusive" } });
+
+  useEffect(() => {
+    if (!monitor || !isOpen) return;
+    let isMounted = true;
+    monitorService
+      .getRootCauseTimeline(monitor.id, "24h")
+      .then((data) => {
+        if (isMounted) setRootCause(data || { items: [], summary: { trend: "inconclusive" } });
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [monitor, isOpen]);
 
   if (!monitor) return null;
 
@@ -339,6 +355,36 @@ const MonitorDetailDrawer = ({ monitor, isOpen, onClose }) => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Root Cause Timeline */}
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Root Cause Timeline
+                </h3>
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {rootCause.items && rootCause.items.length > 0 ? (
+                    rootCause.items.map((it, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                        <div className="w-2 h-2 mt-2 rounded-full bg-danger-500" />
+                        <div className="flex-1">
+                          <p className="text-sm text-neutral-900 dark:text-white">
+                            {new Date(it.timestamp).toLocaleTimeString()} — {String(it.cause_type || 'unknown').replace('_',' ')} {it.status_code ? `(HTTP ${it.status_code})` : ''}
+                          </p>
+                          {it.detail && (
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400">{it.detail}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-neutral-500">
+                      <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No failures in selected range.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">Trend: {rootCause?.summary?.trend || 'inconclusive'}</div>
               </div>
             </div>
           </motion.div>

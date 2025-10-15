@@ -127,6 +127,14 @@ export const useWebSocket = () => {
       },
     );
 
+    // Subscribe to system mood updates for background animation
+    const unsubscribeMood = wsService.subscribe(
+      "system_mood_update",
+      (data) => {
+        window.dispatchEvent(new CustomEvent("system_mood_update", { detail: data }));
+      }
+    );
+
     // Subscribe to notifications with rate limiting
     let lastNotification = 0;
     const unsubscribeNotification = wsService.subscribe(
@@ -193,6 +201,7 @@ export const useWebSocket = () => {
       unsubscribeDisconnection();
       unsubscribeMonitorUpdate();
       unsubscribeStatusChange();
+      unsubscribeMood();
       unsubscribeNotification();
       unsubscribePing();
       unsubscribeError();

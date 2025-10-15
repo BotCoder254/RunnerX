@@ -23,6 +23,7 @@ type UpdatePreferencesRequest struct {
 	DefaultInterval *int    `json:"default_interval,omitempty"`
 	Timezone        *string `json:"timezone,omitempty"`
 	AnimationPref   *bool   `json:"animation_pref,omitempty"`
+    ShowForecast    *bool   `json:"show_forecast,omitempty"`
 }
 
 // GetCurrentUser returns the current authenticated user
@@ -100,6 +101,10 @@ func (uc *UserController) UpdateUserPreferences(c *gin.Context) {
 	if req.AnimationPref != nil {
 		updates["animation_pref"] = *req.AnimationPref
 	}
+
+    if req.ShowForecast != nil {
+        updates["show_forecast"] = *req.ShowForecast
+    }
 
 	if len(updates) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid updates provided"})

@@ -16,5 +16,8 @@ type Check struct {
 	StatusCode  int            `json:"status_code,omitempty"`
 	ErrorMsg    string         `json:"error_msg,omitempty"`
 	ResponseTime time.Duration `json:"response_time"`
+    // Root cause classification
+    CauseType   string         `json:"cause_type,omitempty"`   // dns_error, connection_timeout, http_error, ssl_error, tcp_error, unknown
+    CauseDetail string         `json:"cause_detail,omitempty"`
 }
 

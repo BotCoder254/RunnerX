@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useUserPreferences, useUpdateUserPreferences } from '../../hooks/useUserPreferences';
 import DisplayModeToggle from './DisplayModeToggle';
 
 const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayMode, onDisplayModeChange }) => {
@@ -21,6 +22,9 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
   const { user, logout, lock } = useAuth();
   const { data: notifications } = useNotifications();
   const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const { data: preferences } = useUserPreferences();
+  const updatePreferences = useUpdateUserPreferences();
+  const showForecast = preferences?.show_forecast ?? (localStorage.getItem('show_forecast') !== 'false');
 
   const unreadCount = notifications?.filter(n => !n.seen_at).length || 0;
 
@@ -104,6 +108,10 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
           >
             <Settings className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
           </button>
+          {/* Quick Settings Dropdown */}
+          <div className="relative hidden md:block">
+            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-800 rounded-lg shadow-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden z-50"></div>
+          </div>
 
           {/* User Menu */}
           <div className="relative">
@@ -136,6 +144,19 @@ const Header = ({ onAddMonitor, onToggleSidebar, onToggleNotifications, displayM
                     </p>
                   </div>
                   <div className="p-2">
+                  <div className="px-3 py-2 text-xs uppercase text-neutral-500 dark:text-neutral-400">Preferences</div>
+                  <label className="w-full flex items-center justify-between px-3 py-2 text-neutral-700 dark:text-neutral-300">
+                    <span className="text-sm">Show forecast</span>
+                    <input
+                      type="checkbox"
+                      checked={!!showForecast}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        localStorage.setItem('show_forecast', String(val));
+                        updatePreferences.mutate({ show_forecast: val });
+                      }}
+                    />
+                  </label>
                     <button
                       onClick={() => {
                         lock();

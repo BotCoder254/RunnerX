@@ -33,6 +33,13 @@ func main() {
 	monitorService := services.NewMonitorService(db, hub)
 	go monitorService.Start()
 
+	// Start analytics and system mood services
+	analyticsService := services.NewAnalyticsService(db, hub)
+	go analyticsService.StartHourly()
+
+	systemMoodService := services.NewSystemMoodService(db, hub)
+	go systemMoodService.Start()
+
 	// Setup Gin router
 	r := gin.Default()
 

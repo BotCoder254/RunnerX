@@ -21,6 +21,8 @@ func MonitorRoutes(router *gin.RouterGroup, db *gorm.DB) {
 
 	router.GET("/monitors", monitorController.GetMonitors)
 	router.GET("/monitor/:id", monitorController.GetMonitor)
+    router.GET("/monitor/:id/forecast", monitorController.GetMonitorForecast)
+    router.GET("/monitor/:id/rootcause", monitorController.GetRootCauseTimeline)
 	router.POST("/monitor", monitorController.CreateMonitor)
 	router.POST("/monitor/test", monitorController.TestMonitor)
 	router.PUT("/monitor/:id", monitorController.UpdateMonitor)

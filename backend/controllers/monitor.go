@@ -66,6 +66,104 @@ func (mc *MonitorController) GetMonitor(c *gin.Context) {
 	c.JSON(http.StatusOK, monitor)
 }
 
+// GetMonitorForecast returns recent forecast entries for a monitor
+func (mc *MonitorController) GetMonitorForecast(c *gin.Context) {
+	userID, _ := middleware.GetUserID(c)
+	id := c.Param("id")
+
+	var monitor models.Monitor
+	if err := mc.DB.Where("id = ? AND user_id = ?", id, userID).First(&monitor).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Monitor not found"})
+		return
+	}
+
+	limit := 24
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 168 { // up to 7 days hourly
+			limit = v
+		}
+	}
+
+	var forecasts []models.MonitorForecast
+	if err := mc.DB.Where("monitor_id = ?", monitor.ID).
+		Order("timestamp DESC").
+		Limit(limit).
+		Find(&forecasts).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch forecast"})
+		return
+	}
+
+	c.JSON(http.StatusOK, forecasts)
+}
+
+// GetRootCauseTimeline aggregates failed checks into cause timeline
+func (mc *MonitorController) GetRootCauseTimeline(c *gin.Context) {
+	userID, _ := middleware.GetUserID(c)
+	id := c.Param("id")
+
+	var monitor models.Monitor
+	if err := mc.DB.Where("id = ? AND user_id = ?", id, userID).First(&monitor).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Monitor not found"})
+		return
+	}
+
+	// Range: default 24h
+	rng := c.DefaultQuery("range", "24h")
+	dur, err := time.ParseDuration(rng)
+	if err != nil {
+		dur = 24 * time.Hour
+	}
+	since := time.Now().Add(-dur)
+
+	var checks []models.Check
+	if err := mc.DB.Where("monitor_id = ? AND created_at >= ? AND status = ?", monitor.ID, since, "down").
+		Order("created_at ASC").
+		Find(&checks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch checks"})
+		return
+	}
+
+	// Build timeline
+	type TimelineItem struct {
+		Timestamp  time.Time `json:"timestamp"`
+		CauseType  string    `json:"cause_type"`
+		Detail     string    `json:"detail"`
+		StatusCode int       `json:"status_code"`
+	}
+	items := make([]TimelineItem, 0, len(checks))
+	for _, ch := range checks {
+		items = append(items, TimelineItem{
+			Timestamp:  ch.CreatedAt,
+			CauseType:  ch.CauseType,
+			Detail:     ch.CauseDetail,
+			StatusCode: ch.StatusCode,
+		})
+	}
+
+	// Heuristics summary
+	type Summary struct {
+		Trend string `json:"trend"`
+	}
+	trend := "inconclusive"
+	if len(items) >= 3 {
+		// crude heuristic: many http_error with 5xx -> backend issue
+		http5xx := 0
+		for _, it := range items {
+			if it.CauseType == "http_error" && it.StatusCode >= 500 {
+				http5xx++
+			}
+		}
+		if http5xx >= 2 {
+			trend = "backend_issue_suspected"
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items":   items,
+		"summary": Summary{Trend: trend},
+	})
+}
+
 func (mc *MonitorController) CreateMonitor(c *gin.Context) {
 	userID, _ := middleware.GetUserID(c)
 
@@ -101,7 +199,7 @@ func (mc *MonitorController) CreateMonitor(c *gin.Context) {
 	if monitor.Method == "" {
 		monitor.Method = "GET"
 	}
-	
+
 	if monitor.Timeout == 0 {
 		monitor.Timeout = 10
 	}
@@ -318,4 +416,3 @@ func (mc *MonitorController) TestMonitor(c *gin.Context) {
 		"error":       errorMsg,
 	})
 }
-

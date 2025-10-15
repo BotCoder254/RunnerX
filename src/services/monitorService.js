@@ -41,6 +41,16 @@ export const monitorService = {
     return response.data;
   },
 
+  async getMonitorForecast(id, limit = 24) {
+    const response = await api.get(`/monitor/${id}/forecast?limit=${limit}`);
+    return response.data;
+  },
+
+  async getRootCauseTimeline(id, range = '24h') {
+    const response = await api.get(`/monitor/${id}/rootcause?range=${range}`);
+    return response.data;
+  },
+
   async testMonitor(monitorData) {
     const response = await api.post('/monitor/test', monitorData);
     return response.data;
